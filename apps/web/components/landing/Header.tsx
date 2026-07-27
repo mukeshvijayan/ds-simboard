@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { label: "Boards", href: "#boards" },
   { label: "How it works", href: "#how-it-works" },
   { label: "Breadboard Lab", href: "/breadboard-lab" },
+  { label: "Arduino Lab", href: "/arduino-lab" },
   { label: "Simulator", href: "/simulator" },
 ];
 

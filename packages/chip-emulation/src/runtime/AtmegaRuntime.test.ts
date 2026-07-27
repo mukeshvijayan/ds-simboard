@@ -12,12 +12,13 @@ describe("AtmegaRuntime — the Blink program, running on the real avr8js CPU em
     const events: ChipEvent[] = [];
     const runtime = new AtmegaRuntime(BLINK_PROGRAM, (e) => events.push(e));
     runtime.start();
-    runtime.runInstructions(5000);
+    runtime.runInstructions(8_000_000);
 
     const pin13Changes = events.filter((e) => e.type === "pin-change" && e.pin === "13");
-    // The delay loop is short enough that several toggles happen within
-    // 5000 instructions — this is the real CPU executing real machine
-    // code, not a scripted animation.
+    // The delay loop's tuned length (~1.58M cycles/toggle — see
+    // programs/blink.ts) means several toggles happen within 8M
+    // instructions — this is the real CPU executing real machine code,
+    // not a scripted animation.
     expect(pin13Changes.length).toBeGreaterThan(2);
     expect(pin13Changes[0]).toMatchObject({ type: "pin-change", pin: "13", value: 1 });
   });
@@ -30,7 +31,7 @@ describe("AtmegaRuntime — the Blink program, running on the real avr8js CPU em
       }
     });
     runtime.start();
-    runtime.runInstructions(20000);
+    runtime.runInstructions(10_000_000);
 
     expect(cyclesAtToggle.length).toBeGreaterThanOrEqual(4);
     // Steady-state toggles (skip the first, which includes one-time setup

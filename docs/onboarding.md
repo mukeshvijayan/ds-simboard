@@ -46,13 +46,14 @@ ones that define a matching script, and skips the rest — so adding a new
 package with (say) a `test` script is enough to have it picked up by
 `pnpm test` with no config changes.
 
-## Repo layout (as of Phase 5 — Arduino chip emulation)
+## Repo layout (as of Phase 6 — Arduino Lab UI)
 
 ```
 ds-simboard/
 ├── apps/
 │   └── web/                 Next.js app
-│       ├── app/              Routes only: /, /simulator, /breadboard-lab
+│       ├── app/              Routes only: /, /simulator, /breadboard-lab,
+│       │                     /arduino-lab
 │       ├── components/       landing/, simulator/ — the *existing*
 │       │                     Arduino/ESP32 simulator's feature UI, not
 │       │                     yet split into apps/web/features/ (still
@@ -92,11 +93,18 @@ ds-simboard/
 │                             separate, real emulator that currently only
 │                             runs one precompiled demo program, not
 │                             arbitrary user code (see
-│                             docs/architecture/0007-*.md for why). Neither
-│                             is wired into apps/web's UI yet — the
-│                             existing Arduino/ESP32 simulator and the new
-│                             Breadboard Lab are separate UIs for now,
-│                             matching spec Part 3's "three labs" framing.
+│                             docs/architecture/0007-*.md for why). Wired
+│                             into apps/web/features/arduino-lab/ as of
+│                             Phase 6 — a real board pinout + LED driven by
+│                             actual emulated GPIO state, the running AVR
+│                             assembly shown read-only (no live editing —
+│                             the UI says so plainly), and an honest
+│                             "not wired up yet" serial monitor panel
+│                             rather than a fake one. The existing
+│                             Arduino/ESP32 simulator (SketchEngine),
+│                             Breadboard Lab, and Arduino Lab remain three
+│                             separate UIs for now, matching spec Part 3's
+│                             "three labs" framing.
 ├── packages/
 │   ├── design-system/        DS Inventek tokens + Button/Container/
 │   │                         ScrollReveal, shared by every app in the
