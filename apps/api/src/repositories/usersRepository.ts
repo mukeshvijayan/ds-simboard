@@ -4,7 +4,11 @@ import { users } from "../db/schema";
 
 export function createUsersRepository(db: Database) {
   return {
-    async create(input: { email: string; displayName?: string | null }) {
+    async create(input: {
+      email: string;
+      passwordHash: string;
+      displayName?: string | null;
+    }) {
       const [row] = await db.insert(users).values(input).returning();
       return row;
     },

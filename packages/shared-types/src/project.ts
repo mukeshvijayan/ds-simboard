@@ -2,9 +2,11 @@
 export type LabType = "breadboard" | "arduino" | "esp32";
 
 /**
- * Who can see a project. Sharing *permissions* (read-only vs. editable
- * links) are spec Phase 9 (Auth & accounts) work — this is just the
- * stored visibility, not the access-control logic built on top of it.
+ * Who can see a project. `private` (the default): only the owner.
+ * `unlisted`/`public`: anyone with the project's link can view it
+ * read-only — link-based access never grants write access; only the
+ * authenticated owner can rename/delete/save a snapshot/change
+ * visibility. See docs/architecture/0011-*.md.
  */
 export type ProjectVisibility = "private" | "unlisted" | "public";
 

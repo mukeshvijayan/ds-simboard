@@ -13,7 +13,10 @@ describe("schema migrations — applied against a real (embedded) Postgres", () 
     const { db, close: closeDb } = await createMigratedTestDatabase();
     close = closeDb;
 
-    const [user] = await db.insert(users).values({ email: "a@example.com" }).returning();
+    const [user] = await db
+      .insert(users)
+      .values({ email: "a@example.com", passwordHash: "hash" })
+      .returning();
     expect(user.id).toBeDefined();
     expect(user.createdAt).toBeInstanceOf(Date);
 
@@ -43,8 +46,10 @@ describe("schema migrations — applied against a real (embedded) Postgres", () 
   it("enforces the email unique constraint", async () => {
     const { db, close: closeDb } = await createMigratedTestDatabase();
     close = closeDb;
-    await db.insert(users).values({ email: "dup@example.com" });
-    await expect(db.insert(users).values({ email: "dup@example.com" })).rejects.toThrow();
+    await db.insert(users).values({ email: "dup@example.com", passwordHash: "hash" });
+    await expect(
+      db.insert(users).values({ email: "dup@example.com", passwordHash: "hash" })
+    ).rejects.toThrow();
   });
 
   it("enforces the component_definitions type unique constraint", async () => {
@@ -77,7 +82,7 @@ describe("schema migrations — applied against a real (embedded) Postgres", () 
     close = closeDb;
     const [user] = await db
       .insert(users)
-      .values({ email: "cascade@example.com" })
+      .values({ email: "cascade@example.com", passwordHash: "hash" })
       .returning();
     const [project] = await db
       .insert(projects)

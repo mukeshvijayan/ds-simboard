@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import type { createUsersController } from "../controllers/usersController";
 
 export function createUsersRoutes(
-  controller: ReturnType<typeof createUsersController>
+  controller: ReturnType<typeof createUsersController>,
+  requireAuth: RequestHandler
 ): Router {
   const router = Router();
-  router.post("/", (req, res) => controller.create(req, res));
-  router.get("/:id", (req, res) => controller.getById(req, res));
+  router.get("/:id", requireAuth, (req, res) => controller.getById(req, res));
   return router;
 }

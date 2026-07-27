@@ -28,6 +28,15 @@ export function createProjectsRepository(db: Database) {
     async remove(id: string) {
       await db.delete(projects).where(eq(projects.id, id));
     },
+
+    async updateVisibility(id: string, visibility: "private" | "unlisted" | "public") {
+      const [row] = await db
+        .update(projects)
+        .set({ visibility, updatedAt: new Date() })
+        .where(eq(projects.id, id))
+        .returning();
+      return row ?? null;
+    },
   };
 }
 

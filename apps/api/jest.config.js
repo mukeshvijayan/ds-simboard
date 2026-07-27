@@ -18,6 +18,8 @@ module.exports = {
     "!src/db/schema.ts",
     "!src/db/migrations/**",
     "!src/server.ts",
+    // Ambient type declaration only — no runtime code to cover.
+    "!src/types/**",
   ],
   coverageThreshold: {
     global: {

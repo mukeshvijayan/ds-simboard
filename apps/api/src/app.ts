@@ -4,17 +4,22 @@ import { createUsersRepository } from "./repositories/usersRepository";
 import { createProjectsRepository } from "./repositories/projectsRepository";
 import { createCircuitSnapshotsRepository } from "./repositories/circuitSnapshotsRepository";
 import { createComponentDefinitionsRepository } from "./repositories/componentDefinitionsRepository";
+import { createSessionsRepository } from "./repositories/sessionsRepository";
 import { createUsersService } from "./services/usersService";
 import { createProjectsService } from "./services/projectsService";
 import { createCircuitSnapshotsService } from "./services/circuitSnapshotsService";
+import { createAuthService } from "./services/authService";
 import { createUsersController } from "./controllers/usersController";
 import { createProjectsController } from "./controllers/projectsController";
 import { createCircuitSnapshotsController } from "./controllers/circuitSnapshotsController";
 import { createComponentDefinitionsController } from "./controllers/componentDefinitionsController";
+import { createAuthController } from "./controllers/authController";
 import { createUsersRoutes } from "./routes/usersRoutes";
 import { createProjectsRoutes } from "./routes/projectsRoutes";
 import { createCircuitSnapshotsRoutes } from "./routes/circuitSnapshotsRoutes";
 import { createComponentDefinitionsRoutes } from "./routes/componentDefinitionsRoutes";
+import { createAuthRoutes } from "./routes/authRoutes";
+import { createOptionalAuth, createRequireAuth } from "./middleware/auth";
 
 /**
  * Assembles the full controllers/services/repositories/routes stack over
@@ -23,12 +28,18 @@ import { createComponentDefinitionsRoutes } from "./routes/componentDefinitionsR
  * pglite database and production passes a real Postgres connection,
  * without either one needing different code paths. See
  * docs/architecture/0009-*.md.
+ *
+ * `sessionSecret` signs/verifies session cookies (see
+ * docs/architecture/0010-*.md) — also passed in rather than read from
+ * `process.env` here, so tests can use a fixed test-only secret without
+ * depending on environment state.
  */
-export function createApp(db: Database): Express {
+export function createApp(db: Database, sessionSecret: string): Express {
   const usersRepository = createUsersRepository(db);
   const projectsRepository = createProjectsRepository(db);
   const circuitSnapshotsRepository = createCircuitSnapshotsRepository(db);
   const componentDefinitionsRepository = createComponentDefinitionsRepository(db);
+  const sessionsRepository = createSessionsRepository(db);
 
   const usersService = createUsersService(usersRepository);
   const projectsService = createProjectsService(projectsRepository);
@@ -36,6 +47,7 @@ export function createApp(db: Database): Express {
     circuitSnapshotsRepository,
     projectsRepository
   );
+  const authService = createAuthService(usersRepository, sessionsRepository);
 
   const usersController = createUsersController(usersService);
   const projectsController = createProjectsController(projectsService);
@@ -45,16 +57,24 @@ export function createApp(db: Database): Express {
   const componentDefinitionsController = createComponentDefinitionsController(
     componentDefinitionsRepository
   );
+  const authController = createAuthController(authService, sessionSecret);
+
+  const requireAuth = createRequireAuth(authService, sessionSecret);
+  const optionalAuth = createOptionalAuth(authService, sessionSecret);
 
   const app = express();
   app.use(express.json());
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));
-  app.use("/users", createUsersRoutes(usersController));
-  app.use("/projects", createProjectsRoutes(projectsController));
+  app.use("/auth", createAuthRoutes(authController, requireAuth));
+  app.use("/users", createUsersRoutes(usersController, requireAuth));
+  app.use(
+    "/projects",
+    createProjectsRoutes(projectsController, requireAuth, optionalAuth)
+  );
   app.use(
     "/projects/:projectId/snapshots",
-    createCircuitSnapshotsRoutes(circuitSnapshotsController)
+    createCircuitSnapshotsRoutes(circuitSnapshotsController, requireAuth, optionalAuth)
   );
   app.use(
     "/component-definitions",

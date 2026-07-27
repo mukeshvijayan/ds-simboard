@@ -11,14 +11,31 @@ export const projectVisibilityEnum = pgEnum("project_visibility", [
 ]);
 
 /**
- * Deliberately minimal — no password/session columns yet. See
- * docs/architecture/0009-*.md: authentication is spec Phase 9, a decision
- * the user asked to make directly rather than have preempted here.
+ * Password auth landed in Phase 9 (see docs/architecture/0010-*.md).
+ * `passwordHash` is a bcrypt hash, never the plaintext password.
  */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   displayName: text("display_name"),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * One row per logged-in session (not per-user) — a user can be logged in
+ * from multiple browsers/devices at once, and each needs its own
+ * expiry/revocation, so the session's fields belong on their own row
+ * rather than on `users`. See docs/architecture/0010-*.md. The session
+ * cookie holds a signed reference to `id`; this table is what makes
+ * logout and expiry actually enforceable server-side (unlike a bare JWT).
+ */
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

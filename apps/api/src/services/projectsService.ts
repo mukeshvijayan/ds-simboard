@@ -1,10 +1,16 @@
-import type { CreateProjectInput, LabType, Project } from "@ds-simboard/shared-types";
-import type { ProjectsRepository } from "../repositories/projectsRepository";
+import type {
+  CreateProjectInput,
+  LabType,
+  Project,
+  ProjectVisibility,
+} from "@ds-simboard/shared-types";
+import type { ProjectRow, ProjectsRepository } from "../repositories/projectsRepository";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { toProjectDto } from "./mappers";
 
 const MAX_NAME_LENGTH = 120;
 const VALID_LAB_TYPES: LabType[] = ["breadboard", "arduino", "esp32"];
+const VALID_VISIBILITIES: ProjectVisibility[] = ["private", "unlisted", "public"];
 
 function validateName(name: string): string {
   const trimmed = name.trim();
@@ -17,6 +23,20 @@ function validateName(name: string): string {
     );
   }
   return trimmed;
+}
+
+/**
+ * The read-access rule behind sharing links (see docs/architecture/0011-*.md):
+ * a `private` project is visible only to its owner; `unlisted`/`public`
+ * are visible to anyone, including an anonymous (unauthenticated) caller.
+ * This never grants *write* access — that's always ownership-only,
+ * checked separately.
+ */
+export function canViewProject(
+  project: NonNullable<ProjectRow>,
+  requestingUserId: string | null | undefined
+): boolean {
+  return project.visibility !== "private" || project.ownerId === requestingUserId;
 }
 
 export function createProjectsService(projectsRepository: ProjectsRepository) {
@@ -37,9 +57,15 @@ export function createProjectsService(projectsRepository: ProjectsRepository) {
       return toProjectDto(row);
     },
 
-    async getProject(id: string): Promise<Project> {
+    /**
+     * `requestingUserId` is `null` for an anonymous caller. A private
+     * project a non-owner (or nobody) requests reports 404, not 403 — a
+     * 403 would confirm the project exists, leaking its existence to
+     * someone who isn't allowed to know that.
+     */
+    async getProject(id: string, requestingUserId: string | null): Promise<Project> {
       const row = await projectsRepository.findById(id);
-      if (!row) {
+      if (!row || !canViewProject(row, requestingUserId)) {
         throw new NotFoundError(`No project with id "${id}"`);
       }
       return toProjectDto(row);
@@ -50,11 +76,7 @@ export function createProjectsService(projectsRepository: ProjectsRepository) {
       return rows.map(toProjectDto);
     },
 
-    /**
-     * Only the owner may delete their project. Full auth (verifying
-     * `requestingUserId` is who they claim to be) is spec Phase 9 — this
-     * is the authorization check that sits on top of that once it exists.
-     */
+    /** Only the project's owner may delete it. */
     async deleteProject(id: string, requestingUserId: string): Promise<void> {
       const row = await projectsRepository.findById(id);
       if (!row) {
@@ -64,6 +86,38 @@ export function createProjectsService(projectsRepository: ProjectsRepository) {
         throw new ForbiddenError("Only the project's owner can delete it");
       }
       await projectsRepository.remove(id);
+    },
+
+    /**
+     * Only the owner may change visibility — this is the "explicit
+     * action" that makes a project unlisted/public; it never happens
+     * implicitly. See docs/architecture/0011-*.md.
+     */
+    async updateVisibility(
+      id: string,
+      requestingUserId: string,
+      visibility: ProjectVisibility
+    ): Promise<Project> {
+      if (!VALID_VISIBILITIES.includes(visibility)) {
+        throw new ValidationError(
+          `visibility must be one of: ${VALID_VISIBILITIES.join(", ")}`
+        );
+      }
+      const row = await projectsRepository.findById(id);
+      if (!row) {
+        throw new NotFoundError(`No project with id "${id}"`);
+      }
+      if (row.ownerId !== requestingUserId) {
+        throw new ForbiddenError("Only the project's owner can change its visibility");
+      }
+      const updated = await projectsRepository.updateVisibility(id, visibility);
+      if (!updated) {
+        // Deleted by another request between the findById above and this
+        // update — a genuine (if rare) race, not a scenario worth a
+        // different error shape than "the project isn't there".
+        throw new NotFoundError(`No project with id "${id}"`);
+      }
+      return toProjectDto(updated);
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { CircuitSnapshot, Project } from "@ds-simboard/shared-types";
+import type { CircuitSnapshot, Project, User } from "@ds-simboard/shared-types";
 import type { ProjectRow } from "../repositories/projectsRepository";
 
 /**
@@ -16,6 +16,21 @@ export function toProjectDto(row: NonNullable<ProjectRow>): Project {
     visibility: row.visibility,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Never includes `passwordHash` — that field must never reach an API response. */
+export function toUserDto(row: {
+  id: string;
+  email: string;
+  displayName: string | null;
+  createdAt: Date;
+}): User {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 

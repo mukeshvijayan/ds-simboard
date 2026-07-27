@@ -27,7 +27,11 @@ describe("circuitSnapshotsController — unexpected errors", () => {
     const res = fakeRes();
 
     await controller.create(
-      { params: { projectId: "p1" }, body: { graph: {} } } as never,
+      {
+        params: { projectId: "p1" },
+        body: { graph: {} },
+        user: { id: "u1", email: "u1@example.com", displayName: null, createdAt: "" },
+      } as never,
       res
     );
 
