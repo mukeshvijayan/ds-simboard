@@ -6,19 +6,23 @@ import { EngineEvent } from "./types";
  * This is a deliberately simple, line-stepping interpreter — NOT a real
  * AVR/Xtensa emulator. It recognizes a small, common subset of the Arduino
  * API (pinMode, digitalWrite, digitalRead, analogWrite, delay, Serial.begin,
- * Serial.print/println) executed in a straight line inside setup()/loop().
- * It does not evaluate expressions, variables, conditionals, or loops.
+ * Serial.print/println, WiFi.begin/disconnect) executed in a straight line
+ * inside setup()/loop(). It does not evaluate expressions, variables,
+ * conditionals, or loops.
  *
  * This exists so the scaffold runs an end-to-end demo (the default blink
  * sketches work out of the box) while keeping a clean seam to swap in a
  * real emulator later:
  *
- *   - For AVR boards (Arduino Uno), wire this up to `avr8js`
- *     (https://github.com/wokwi/avr8js) — compile the sketch with an
- *     in-browser avr-gcc (e.g. via a WASM toolchain) and step the CPU
- *     instead of this interpreter.
- *   - For ESP32, look at `esptool-js` / QEMU-based Xtensa emulation for
- *     the same role.
+ *   - For AVR boards (Arduino Uno), this seam is now partly used —
+ *     `packages/chip-emulation`'s `AtmegaRuntime` wraps a real `avr8js`
+ *     CPU emulator, though only for a precompiled demo program, not this
+ *     engine's live-typed sketches yet (see docs/architecture/0007-*.md).
+ *   - For ESP32 (Xtensa), no equivalent emulator exists — confirmed by a
+ *     real search, not assumed — so this engine remains the only
+ *     execution path for ESP32 sketches (see docs/architecture/0008-*.md).
+ *     `WiFi.begin`/`WiFi.disconnect` are stubs: recognized statements that
+ *     report a canned outcome, not a real network stack.
  *
  * Swap point: replace `SketchEngine.start()` internals; keep emitting the
  * same `EngineEvent` shape so the UI layer (BoardCanvas, SerialMonitor)
@@ -126,6 +130,23 @@ export class SketchEngine {
       const [, , rawArg] = match;
       const text = rawArg.trim().replace(/^"(.*)"$/, "$1");
       this.onEvent({ type: "serial", text });
+      return;
+    }
+
+    // WiFi is a stub (ESP32 Lab, spec Part 6 Phase 7): there's no real
+    // network stack, so `WiFi.begin` reports "connected" immediately
+    // rather than simulating a handshake — same honesty-over-scope
+    // tradeoff as this whole engine. See docs/architecture/0008-*.md.
+    if (
+      (match = statement.match(/^WiFi\.begin\s*\(\s*"([^"]*)"\s*(?:,\s*"[^"]*"\s*)?\)$/))
+    ) {
+      const [, ssid] = match;
+      this.onEvent({ type: "wifi", wifiStatus: "connected", ssid });
+      return;
+    }
+
+    if (/^WiFi\.disconnect\s*\(\s*\)$/.test(statement)) {
+      this.onEvent({ type: "wifi", wifiStatus: "disconnected" });
       return;
     }
 

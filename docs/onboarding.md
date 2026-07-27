@@ -46,14 +46,14 @@ ones that define a matching script, and skips the rest — so adding a new
 package with (say) a `test` script is enough to have it picked up by
 `pnpm test` with no config changes.
 
-## Repo layout (as of Phase 6 — Arduino Lab UI)
+## Repo layout (as of Phase 7 — ESP32 Lab)
 
 ```
 ds-simboard/
 ├── apps/
 │   └── web/                 Next.js app
 │       ├── app/              Routes only: /, /simulator, /breadboard-lab,
-│       │                     /arduino-lab
+│       │                     /arduino-lab, /esp32-lab
 │       ├── components/       landing/, simulator/ — the *existing*
 │       │                     Arduino/ESP32 simulator's feature UI, not
 │       │                     yet split into apps/web/features/ (still
@@ -62,6 +62,18 @@ ds-simboard/
 │       │                     the Part 4 features/ pattern, for the new
 │       │                     Phase 4 UI specifically)
 │       ├── features/
+│       │   ├── esp32-lab/    The Phase 7 UI: the *same* SketchEngine
+│       │   │                 interpreter as /simulator (no Xtensa
+│       │   │                 emulator exists — confirmed by a real npm
+│       │   │                 search, see docs/architecture/0008-*.md),
+│       │   │                 but its own dedicated route/board (all 19
+│       │   │                 GPIO pins), a live code editor + serial
+│       │   │                 monitor (both genuinely work, unlike
+│       │   │                 Arduino Lab), and a Wi-Fi connection stub
+│       │   │                 (WiFi.begin/disconnect — new recognized
+│       │   │                 statements in lib/simulation/engine.ts,
+│       │   │                 which also gained its first tests this
+│       │   │                 phase: lib/simulation/engine.test.ts).
 │       │   └── breadboard-lab/   The Phase 4 UI — the first thing wired to
 │       │                         circuit-engine + component-library:
 │       │                         ├── model/       Pure, framework-agnostic

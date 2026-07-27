@@ -35,11 +35,16 @@ export interface SerialLine {
 
 export type EngineStatus = "idle" | "running" | "stopped" | "error";
 
+/** A stub — no real network stack, see engine.ts's `WiFi.begin` handling. */
+export type WifiStatus = "disconnected" | "connected";
+
 export interface EngineEvent {
-  type: "pin-change" | "serial" | "status" | "error";
+  type: "pin-change" | "serial" | "status" | "error" | "wifi";
   pin?: string;
   value?: number;
   text?: string;
   status?: EngineStatus;
   message?: string;
+  wifiStatus?: WifiStatus;
+  ssid?: string;
 }

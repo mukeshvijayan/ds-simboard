@@ -18,6 +18,7 @@ void loop() {
 export const ESP32_DEFAULT_SKETCH = `void setup() {
   pinMode(2, OUTPUT);
   Serial.begin(115200);
+  WiFi.begin("HomeNetwork", "password123");
 }
 
 void loop() {
