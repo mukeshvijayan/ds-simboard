@@ -17,6 +17,7 @@ module.exports = {
     "!src/db/client.ts",
     "!src/db/schema.ts",
     "!src/db/migrations/**",
+    "!src/db/migrateProduction.ts",
     "!src/server.ts",
     // Ambient type declaration only — no runtime code to cover.
     "!src/types/**",

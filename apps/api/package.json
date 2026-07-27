@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "db:generate": "drizzle-kit generate",
+    "db:migrate:production": "tsx src/db/migrateProduction.ts",
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {

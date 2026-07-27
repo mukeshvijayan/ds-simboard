@@ -36,6 +36,31 @@ no dev server startup script beyond `pnpm --filter @ds-simboard/api dev`
 own tests — those run against an embedded database. See
 docs/architecture/0009-*.md.
 
+### Production database (Supabase) — one-time setup, not part of normal dev
+
+Production hosting is Supabase (ap-northeast-2, transaction-mode pooler)
+and Vercel — see docs/architecture/0015-\*.md for the full reasoning. Day
+to day development and every test run use an embedded database and need
+no credential at all; the real `DATABASE_URL`/`SESSION_SECRET` only
+matter when applying a schema change to the real production database, or
+when running `apps/api` locally against it on purpose:
+
+```bash
+cd apps/api
+DATABASE_URL="<real Supabase connection string>" pnpm run db:migrate:production
+```
+
+This runs the exact same Drizzle `migrate()` call, against the exact same
+committed migration files in `src/db/migrations/`, that every test run
+already exercises against an embedded Postgres — it's safe to run more
+than once (Drizzle tracks what's already applied) and is never run
+automatically by the app itself; see `src/db/migrateProduction.ts`'s own
+docstring and ADR 0015 for why it's a deliberate, hand-run step.
+
+`apps/api` deploys to Vercel as its own project (`api/index.ts` is the
+serverless entrypoint Vercel actually calls, not `src/server.ts`) — see
+ADR 0015 for the Root Directory/environment-variable setup.
+
 ## Common commands (run from the repo root)
 
 | Command          | What it does                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -45,6 +70,7 @@ docs/architecture/0009-*.md.
 | `pnpm typecheck` | `tsc --noEmit` in every workspace package/app                                                                                                                                                                                                                                                                                                                                                                          |
 | `pnpm lint`      | ESLint in every workspace package/app                                                                                                                                                                                                                                                                                                                                                                                  |
 | `pnpm test`      | Unit tests in every workspace package/app (`packages/circuit-engine`, `packages/component-library`, `packages/chip-emulation`, and `apps/api` all have full Jest suites at 100% coverage; `apps/web` has a Jest suite scoped to `features/*/model/**` and `lib/simulation/**` — not coverage-enforced, since it's UI-adjacent glue, not physics; `packages/design-system`/`packages/shared-types` still have no tests) |
+| `pnpm e2e`       | Playwright golden-path + automated accessibility (axe-core) tests for `apps/web`, against a real `next build && next start` — see docs/architecture/0012-\*.md                                                                                                                                                                                                                                                         |
 | `pnpm format`    | Prettier `--write` across the repo                                                                                                                                                                                                                                                                                                                                                                                     |
 
 All of the above are `turbo run <task>` under the hood: Turborepo looks at
@@ -211,13 +237,17 @@ not a Next.js Route Handler, deliberately (see docs/architecture/0009-*.md)
   apply cleanly and that constraints (foreign keys, uniqueness) are
   genuinely enforced by the database. 100% coverage, same bar as
   circuit-engine/component-library/chip-emulation.
-- **What's still missing, and why:** a real production `DATABASE_URL` —
-  see `apps/api/.env.example`. No hosting provider has been chosen; that's
-  a product/cost decision for the project owner. `db/client.ts`'s
-  production path (`createProductionDatabase`) is untested against a real
-  server for exactly this reason.
-- No password/session fields on `users` yet — spec Phase 9 decides how
-  auth actually works, deliberately not preempted here.
+- **Production database**: Supabase (ap-northeast-2, transaction-mode
+  pooler) — see docs/architecture/0015-*.md. Migrations have been run
+  against it; `apps/api` deploys to Vercel as its own project via
+  `api/index.ts` (a serverless adapter — `src/server.ts`'s `app.listen()`
+  is for a traditional host/local dev only).
+- Password/session auth (bcrypt + signed session cookies) landed in
+  Phase 9 — see docs/architecture/0010-\*.md — along with sharing-link
+  visibility semantics (docs/architecture/0011-\*.md). **Known gap**:
+  `apps/web` has no UI wired to call any of this yet (no save/load/share
+  feature in the labs) — the backend is real and tested, the frontend
+  integration is a real v1 limitation, not yet built.
 
 ## Code style
 
@@ -233,5 +263,5 @@ not a Next.js Route Handler, deliberately (see docs/architecture/0009-*.md)
 ## CI
 
 `.github/workflows/ci.yml` runs `pnpm install` → `pnpm format:check` →
-`pnpm lint` → `pnpm typecheck` → `pnpm build` → `pnpm test` on every push
-and PR.
+`pnpm lint` → `pnpm typecheck` → `pnpm build` → `pnpm test` →
+(install Playwright's Chromium) → `pnpm e2e` on every push and PR.

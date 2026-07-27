@@ -10,17 +10,17 @@ import * as schema from "./schema";
 export type Database = NodePgDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 /**
- * The real, production database connection. Throws rather than silently
- * falling back to anything if `databaseUrl` is empty — a missing
- * `DATABASE_URL` should fail loudly at startup, not degrade into an
- * accidental in-memory database. See docs/architecture/0009-*.md: no
- * production database has been provisioned yet, so this path is untested
- * against a real server (though it's the same `drizzle-orm/node-postgres`
- * driver used throughout the Drizzle ecosystem).
+ * The real, production database connection — Supabase (ap-northeast-2),
+ * via its transaction-mode pooler, per docs/architecture/0015-*.md.
+ * Throws rather than silently falling back to anything if `databaseUrl`
+ * is empty — a missing `DATABASE_URL` should fail loudly at startup, not
+ * degrade into an accidental in-memory database. Returns the underlying
+ * `Pool` too (`$client`) so callers (e.g. `migrateProduction.ts`) can
+ * close it explicitly rather than leaving connections open.
  */
 export function createProductionDatabase(
   databaseUrl: string | undefined
-): NodePgDatabase<typeof schema> {
+): NodePgDatabase<typeof schema> & { $client: Pool } {
   if (!databaseUrl) {
     throw new Error(
       "DATABASE_URL is required to connect to the production database — see docs/architecture/0009-*.md"
