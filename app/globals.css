@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: #faf8f3;
+  color: #1c1b18;
+}
+
+/* Visible keyboard focus everywhere — no outline: none anywhere in this project */
+:focus-visible {
+  outline: 2px solid #22314f;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(34, 49, 79, 0.15);
+}
+
+.hairline {
+  border-color: rgba(28, 27, 24, 0.08);
+}
