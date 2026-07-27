@@ -30,12 +30,12 @@ export function ComponentPalette({ onAdd }: { onAdd: (type: ComponentType) => vo
             className="flex items-center justify-between rounded-sm border border-hairline bg-white px-3 py-2.5 text-left text-[13.5px] text-charcoal transition-colors hover:border-charcoal/25"
           >
             {item.label}
-            <span className="text-[11px] text-charcoal-faint">+ Add</span>
+            <span className="text-[11px] text-charcoal-muted">+ Add</span>
           </button>
         ))}
       </div>
 
-      <p className="mt-auto border-t border-hairline px-4 py-3 text-[12px] leading-relaxed text-charcoal-faint">
+      <p className="mt-auto border-t border-hairline px-4 py-3 text-[12px] leading-relaxed text-charcoal-muted">
         Drag a component onto the board, or click &ldquo;+ Add&rdquo; to place it near the
         center.
       </p>

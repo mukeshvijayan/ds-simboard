@@ -9,7 +9,7 @@ export function TrustBadges() {
         {BADGES.map((badge) => (
           <span
             key={badge}
-            className="text-[12px] font-medium uppercase tracking-[0.12em] text-charcoal-faint"
+            className="text-[12px] font-medium uppercase tracking-[0.12em] text-charcoal-muted"
           >
             {badge}
           </span>

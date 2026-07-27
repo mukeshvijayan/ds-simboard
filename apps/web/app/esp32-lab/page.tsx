@@ -8,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function ESP32LabPage() {
-  return <ESP32Lab />;
+  return (
+    <main>
+      <ESP32Lab />
+    </main>
+  );
 }

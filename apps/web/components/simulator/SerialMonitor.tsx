@@ -19,10 +19,12 @@ export function SerialMonitor({ lines }: { lines: SerialLine[] }) {
       </div>
       <div
         ref={scrollRef}
+        role="log"
+        aria-live="polite"
         className="flex-1 overflow-y-auto px-4 py-2 font-mono text-[12px] leading-relaxed text-charcoal"
       >
         {lines.length === 0 && (
-          <p className="text-charcoal-faint">
+          <p className="text-charcoal-muted">
             Output from Serial.print() appears here once the sketch runs.
           </p>
         )}

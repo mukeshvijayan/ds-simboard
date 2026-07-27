@@ -6,12 +6,12 @@ const COPY: Record<ResolveCircuitResult["status"], { label: string; className: s
   {
     empty: {
       label: "Nothing wired yet",
-      className: "bg-charcoal-faint/20 text-charcoal-muted",
+      className: "bg-charcoal-faint/20 text-charcoal",
     },
     conducting: { label: "Circuit is live", className: "bg-navy/10 text-navy" },
     "non-conducting": {
       label: "No current is flowing",
-      className: "bg-charcoal-faint/20 text-charcoal-muted",
+      className: "bg-charcoal-faint/20 text-charcoal",
     },
     "short-circuit": {
       label: "Short circuit — a component has failed",

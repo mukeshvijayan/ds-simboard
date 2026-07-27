@@ -24,7 +24,10 @@ export function PartsPalette({
   onCancel: () => void;
 }) {
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col gap-3 border-r border-hairline bg-ivory p-4">
+    <aside
+      aria-label="Parts palette"
+      className="flex w-[220px] shrink-0 flex-col gap-3 border-r border-hairline bg-ivory p-4"
+    >
       <p className="text-[12px] font-medium uppercase tracking-[0.1em] text-charcoal-muted">
         Parts
       </p>
@@ -65,13 +68,13 @@ export function PartsPalette({
         <button
           type="button"
           onClick={onCancel}
-          className="mt-1 text-left text-[12px] text-charcoal-faint hover:text-charcoal"
+          className="mt-1 text-left text-[12px] text-charcoal-muted hover:text-charcoal"
         >
           Cancel
         </button>
       )}
 
-      <p className="mt-auto border-t border-hairline pt-3 text-[12px] leading-relaxed text-charcoal-faint">
+      <p className="mt-auto border-t border-hairline pt-3 text-[12px] leading-relaxed text-charcoal-muted">
         {mode.kind === "placing" &&
           (mode.type === "led" || mode.type === "diode") &&
           "Click the anode (+) hole first, then the cathode (−) hole."}

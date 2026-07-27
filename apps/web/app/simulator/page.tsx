@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Toolbar } from "@/components/simulator/Toolbar";
 import { ComponentPalette } from "@/components/simulator/ComponentPalette";
 import { BoardCanvas } from "@/components/simulator/BoardCanvas";
-import { CodeEditor } from "@/components/simulator/CodeEditor";
 import { SerialMonitor } from "@/components/simulator/SerialMonitor";
 import { SketchEngine } from "@/lib/simulation/engine";
 import { BOARDS } from "@/lib/simulation/boards";
@@ -16,6 +16,14 @@ import {
   PlacedComponent,
   SerialLine,
 } from "@/lib/simulation/types";
+
+// CodeMirror (@uiw/react-codemirror + @codemirror/*) is a sizeable,
+// client-only editor — code-split it into its own chunk rather than
+// bundling it into this route's initial JS.
+const CodeEditor = dynamic(
+  () => import("@/components/simulator/CodeEditor").then((mod) => mod.CodeEditor),
+  { ssr: false }
+);
 
 let nextInstanceId = 1;
 let nextSerialId = 1;
@@ -103,7 +111,8 @@ export default function SimulatorPage() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col">
+    <main className="flex h-screen flex-col">
+      <h1 className="sr-only">Simulator</h1>
       <Toolbar
         boardId={boardId}
         status={status}
@@ -142,6 +151,6 @@ export default function SimulatorPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

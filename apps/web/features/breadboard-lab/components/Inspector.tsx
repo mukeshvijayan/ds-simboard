@@ -19,8 +19,11 @@ export function Inspector({
 }) {
   if (!component) {
     return (
-      <aside className="w-[240px] shrink-0 border-l border-hairline bg-ivory p-4">
-        <p className="text-[13px] text-charcoal-faint">
+      <aside
+        aria-label="Component inspector"
+        className="w-[240px] shrink-0 border-l border-hairline bg-ivory p-4"
+      >
+        <p className="text-[13px] text-charcoal-muted">
           Select a component to see its details.
         </p>
       </aside>
@@ -28,11 +31,14 @@ export function Inspector({
   }
 
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col gap-3 border-l border-hairline bg-ivory p-4">
+    <aside
+      aria-label="Component inspector"
+      className="flex w-[240px] shrink-0 flex-col gap-3 border-l border-hairline bg-ivory p-4"
+    >
       <p className="text-[12px] font-medium uppercase tracking-[0.1em] text-charcoal-muted">
         {PART_LABELS[component.type]}
       </p>
-      <p className="font-mono text-[12px] text-charcoal-faint">{component.id}</p>
+      <p className="font-mono text-[12px] text-charcoal-muted">{component.id}</p>
 
       <dl className="flex flex-col gap-1.5 text-[13px] text-charcoal">
         <div className="flex justify-between">

@@ -7,10 +7,10 @@ export function HeroPreview() {
           <span className="h-2.5 w-2.5 rounded-full border border-charcoal/15" />
           <span className="h-2.5 w-2.5 rounded-full border border-charcoal/15" />
         </div>
-        <span className="font-mono text-[11px] text-charcoal-faint">
+        <span className="font-mono text-[11px] text-charcoal">
           blink_led.ino — running
         </span>
-        <span className="flex items-center gap-1.5 text-[11px] text-charcoal-muted">
+        <span className="flex items-center gap-1.5 text-[11px] text-charcoal">
           <span className="h-1.5 w-1.5 rounded-full bg-navy" />
           live
         </span>
@@ -91,36 +91,36 @@ export function HeroPreview() {
         {/* Code mock */}
         <div className="bg-[#1C1B18] p-5 font-mono text-[12px] leading-relaxed text-ivory/80">
           <div>
-            <span className="text-ivory/40">1</span>{" "}
+            <span className="text-ivory/65">1</span>{" "}
             <span className="text-[#8FA6C9]">void</span> setup() {"{"}
           </div>
           <div>
-            <span className="text-ivory/40">2</span> pinMode(13, OUTPUT);
+            <span className="text-ivory/65">2</span> pinMode(13, OUTPUT);
           </div>
           <div>
-            <span className="text-ivory/40">3</span> {"}"}
+            <span className="text-ivory/65">3</span> {"}"}
           </div>
           <div>
-            <span className="text-ivory/40">4</span>
+            <span className="text-ivory/65">4</span>
           </div>
           <div>
-            <span className="text-ivory/40">5</span>{" "}
+            <span className="text-ivory/65">5</span>{" "}
             <span className="text-[#8FA6C9]">void</span> loop() {"{"}
           </div>
           <div>
-            <span className="text-ivory/40">6</span> digitalWrite(13, HIGH);
+            <span className="text-ivory/65">6</span> digitalWrite(13, HIGH);
           </div>
           <div>
-            <span className="text-ivory/40">7</span> delay(500);
+            <span className="text-ivory/65">7</span> delay(500);
           </div>
           <div>
-            <span className="text-ivory/40">8</span> digitalWrite(13, LOW);
+            <span className="text-ivory/65">8</span> digitalWrite(13, LOW);
           </div>
           <div>
-            <span className="text-ivory/40">9</span> delay(500);
+            <span className="text-ivory/65">9</span> delay(500);
           </div>
           <div>
-            <span className="text-ivory/40">10</span> {"}"}
+            <span className="text-ivory/65">10</span> {"}"}
           </div>
         </div>
       </div>

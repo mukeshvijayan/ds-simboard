@@ -13,6 +13,8 @@ const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
+    "./features/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
     "../../packages/design-system/src/**/*.{ts,tsx}",
   ],
   plugins: [],

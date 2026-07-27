@@ -10,12 +10,12 @@ const FOOTER_LINKS = [
 export function Footer() {
   return (
     <footer className="py-8">
-      <Container className="flex flex-col items-center justify-between gap-4 text-[13px] text-charcoal-faint md:flex-row">
+      <Container className="flex flex-col items-center justify-between gap-4 text-[13px] text-charcoal-muted md:flex-row">
         <span>© {new Date().getFullYear()} DS SimBoard</span>
 
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-6" aria-label="Footer">
           {FOOTER_LINKS.map((link) => (
-            <Link key={link.label} href={link.href} className="hover:text-charcoal-muted">
+            <Link key={link.label} href={link.href} className="hover:text-charcoal">
               {link.label}
             </Link>
           ))}
@@ -23,7 +23,7 @@ export function Footer() {
 
         <a
           href="https://dsinventek.com"
-          className="text-charcoal-faint hover:text-charcoal-muted"
+          className="text-charcoal-muted hover:text-charcoal"
         >
           A DS Inventek product
         </a>

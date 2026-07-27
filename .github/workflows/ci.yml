@@ -37,3 +37,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Install Playwright's browser
+        run: pnpm --filter @ds-simboard/web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm e2e

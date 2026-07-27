@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function ArduinoLabPage() {
   return (
-    <div className="h-screen">
+    <main className="h-screen">
       <ArduinoLab />
-    </div>
+    </main>
   );
 }

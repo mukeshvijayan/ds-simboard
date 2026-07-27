@@ -102,7 +102,7 @@ export function BoardCanvas({
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onRemove(component.instanceId)}
               aria-label="Remove component"
-              className="text-charcoal-faint hover:text-charcoal"
+              className="text-charcoal-muted hover:text-charcoal"
             >
               <X size={12} />
             </button>

@@ -8,6 +8,7 @@ import {
   DEFAULT_SUPPLY_VOLTAGE,
   NOMINAL_HEALTH,
 } from "./constants";
+import { DesktopOnlyNotice } from "@/components/shared/DesktopOnlyNotice";
 import { BreadboardGrid } from "./components/BreadboardGrid";
 import { PartsPalette } from "./components/PartsPalette";
 import { Inspector } from "./components/Inspector";
@@ -166,66 +167,69 @@ export function BreadboardLab() {
   const selectedComponent = components.find((c) => c.id === selectedComponentId) ?? null;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-4 border-b border-hairline bg-ivory px-4 py-3">
-        <StatusBanner result={result} />
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-[13px] text-charcoal-muted">
-            Supply
-            <input
-              type="number"
-              min={0}
-              max={24}
-              step={0.5}
-              value={supplyVoltage}
-              onChange={(e) => setSupplyVoltage(Number(e.target.value))}
-              className="w-16 rounded-sm border border-hairline px-2 py-1 text-[13px] text-charcoal"
-            />
-            V
-          </label>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-sm border border-hairline px-3 py-1.5 text-[13px] text-charcoal-muted hover:border-charcoal/25 hover:text-charcoal"
-          >
-            Reset
-          </button>
+    <>
+      <DesktopOnlyNotice labName="Breadboard Lab" />
+      <div className="hidden h-full flex-col lg:flex">
+        <div className="flex items-center justify-between gap-4 border-b border-hairline bg-ivory px-4 py-3">
+          <StatusBanner result={result} />
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-[13px] text-charcoal-muted">
+              Supply
+              <input
+                type="number"
+                min={0}
+                max={24}
+                step={0.5}
+                value={supplyVoltage}
+                onChange={(e) => setSupplyVoltage(Number(e.target.value))}
+                className="w-16 rounded-sm border border-hairline px-2 py-1 text-[13px] text-charcoal"
+              />
+              V
+            </label>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="rounded-sm border border-hairline px-3 py-1.5 text-[13px] text-charcoal-muted hover:border-charcoal/25 hover:text-charcoal"
+            >
+              Reset
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <PartsPalette
-          mode={mode}
-          onStartPlacing={(type) => setMode({ kind: "placing", type })}
-          onStartWiring={() => setMode({ kind: "wiring" })}
-          onCancel={() => setMode({ kind: "idle" })}
-        />
+        <div className="flex flex-1 overflow-hidden">
+          <PartsPalette
+            mode={mode}
+            onStartPlacing={(type) => setMode({ kind: "placing", type })}
+            onStartWiring={() => setMode({ kind: "wiring" })}
+            onCancel={() => setMode({ kind: "idle" })}
+          />
 
-        <div className="flex-1 overflow-auto p-6">
-          <BreadboardGrid
-            columns={BREADBOARD_COLUMNS}
-            components={components}
-            wires={wires}
-            componentResults={result.componentResults}
-            pendingHole={pendingHole}
-            selectedComponentId={selectedComponentId}
-            onHoleClick={handleHoleClick}
-            onComponentClick={setSelectedComponentId}
+          <div className="flex-1 overflow-auto p-6">
+            <BreadboardGrid
+              columns={BREADBOARD_COLUMNS}
+              components={components}
+              wires={wires}
+              componentResults={result.componentResults}
+              pendingHole={pendingHole}
+              selectedComponentId={selectedComponentId}
+              onHoleClick={handleHoleClick}
+              onComponentClick={setSelectedComponentId}
+            />
+          </div>
+
+          <Inspector
+            component={selectedComponent}
+            result={
+              selectedComponentId
+                ? result.componentResults.get(selectedComponentId)
+                : undefined
+            }
+            onTogglePressed={handleTogglePressed}
+            onWiperChange={handleWiperChange}
+            onRemove={handleRemove}
           />
         </div>
-
-        <Inspector
-          component={selectedComponent}
-          result={
-            selectedComponentId
-              ? result.componentResults.get(selectedComponentId)
-              : undefined
-          }
-          onTogglePressed={handleTogglePressed}
-          onWiperChange={handleWiperChange}
-          onRemove={handleRemove}
-        />
       </div>
-    </div>
+    </>
   );
 }

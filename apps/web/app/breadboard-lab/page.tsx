@@ -9,8 +9,9 @@ export const metadata: Metadata = {
 
 export default function BreadboardLabPage() {
   return (
-    <div className="h-screen">
+    <main className="h-screen">
+      <h1 className="sr-only">Breadboard Lab</h1>
       <BreadboardLab />
-    </div>
+    </main>
   );
 }
