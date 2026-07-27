@@ -46,7 +46,7 @@ ones that define a matching script, and skips the rest — so adding a new
 package with (say) a `test` script is enough to have it picked up by
 `pnpm test` with no config changes.
 
-## Repo layout (as of Phase 4 — Breadboard Lab UI)
+## Repo layout (as of Phase 5 — Arduino chip emulation)
 
 ```
 ds-simboard/
@@ -85,11 +85,17 @@ ds-simboard/
 │                             — a deliberately simple line-stepping
 │                             interpreter, NOT the real chip emulator.
 │                             Read lib/simulation/engine.ts's docstring
-│                             before extending it. This becomes
-│                             packages/chip-emulation in Phase 5. Still not
-│                             wired to circuit-engine/component-library —
-│                             the existing Arduino/ESP32 simulator and the
-│                             new Breadboard Lab are separate UIs for now,
+│                             before extending it. Still not replaced —
+│                             it's the only path from user-typed sketch
+│                             text to running behavior right now, and
+│                             packages/chip-emulation (below) is a
+│                             separate, real emulator that currently only
+│                             runs one precompiled demo program, not
+│                             arbitrary user code (see
+│                             docs/architecture/0007-*.md for why). Neither
+│                             is wired into apps/web's UI yet — the
+│                             existing Arduino/ESP32 simulator and the new
+│                             Breadboard Lab are separate UIs for now,
 │                             matching spec Part 3's "three labs" framing.
 ├── packages/
 │   ├── design-system/        DS Inventek tokens + Button/Container/
@@ -97,6 +103,21 @@ ds-simboard/
 │   │                         workspace. Ships TypeScript source directly
 │   │                         (see docs/architecture/0002-*.md) — no build
 │   │                         step, no watch process to run.
+│   ├── chip-emulation/        AtmegaRuntime wraps avr8js's real,
+│   │                         instruction-stepping ATmega328P CPU emulator
+│   │                         (MIT licensed, from Wokwi) and runs a
+│   │                         precompiled machine-code program (see
+│   │                         src/programs/blink.ts — includes the AVR
+│   │                         assembly source it was generated from, and
+│   │                         how), emitting real pin-change events as the
+│   │                         emulated CPU actually executes instructions.
+│   │                         No live sketch compilation — see
+│   │                         docs/architecture/0007-*.md for the
+│   │                         feasibility investigation (GPL/unvetted-
+│   │                         package risk in the only compiler option
+│   │                         found) that led to this scope, chosen
+│   │                         explicitly by the user after being presented
+│   │                         the tradeoffs.
 │   ├── circuit-engine/        Framework-agnostic circuit math:
 │   │                         ├── graph/       UnionFind + CircuitGraph
 │   │                         │                (generic node/element model),
@@ -131,9 +152,10 @@ ds-simboard/
 │                                              + battery lights up; remove
 │                                              resistor → burns out") through
 │                                              the real circuit-engine graph
-│                             Both circuit-engine and component-library
-│                             enforce 100% branch/line/function coverage via
-│                             jest.config.js's coverageThreshold.
+│                             circuit-engine, component-library, and
+│                             chip-emulation all enforce 100% branch/line/
+│                             function coverage via jest.config.js's
+│                             coverageThreshold.
 ├── docs/
 │   ├── MASTER_BUILD_SPEC.md  The spec — read this first
 │   ├── architecture/         ADRs — one file per non-obvious decision
@@ -144,10 +166,10 @@ ds-simboard/
                               package's tsconfig.json extends this
 ```
 
-`packages/chip-emulation`, `packages/shared-types`, and `apps/api` from the
-target architecture in spec Part 4 don't exist yet — they land in Phase 5,
-(introduced alongside whichever package first needs shared types), and
-Phase 8 respectively. Don't be surprised not to find them.
+`packages/shared-types` and `apps/api` from the target architecture in
+spec Part 4 don't exist yet — they land alongside whichever package first
+needs shared types, and in Phase 8, respectively. Don't be surprised not
+to find them.
 
 ## Code style
 
