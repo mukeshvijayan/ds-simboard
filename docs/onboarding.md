@@ -25,18 +25,20 @@ pnpm dev
 
 `pnpm dev` runs `turbo run dev`, which currently starts only
 `apps/web` (the only app with a `dev` script) at `http://localhost:3000` —
-`/` is the landing page, `/simulator` is the simulator shell.
+`/` is the landing page, `/simulator` is the existing Arduino/ESP32
+simulator shell, `/breadboard-lab` is the Phase 4 Breadboard Lab (the first
+UI wired to `circuit-engine` + `component-library`).
 
 ## Common commands (run from the repo root)
 
-| Command          | What it does                                                                                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`       | Start every app's dev server (today: just `apps/web`)                                                                                                                                                                                       |
-| `pnpm build`     | Production build of every workspace package/app                                                                                                                                                                                             |
-| `pnpm typecheck` | `tsc --noEmit` in every workspace package/app                                                                                                                                                                                               |
-| `pnpm lint`      | ESLint in every workspace package/app                                                                                                                                                                                                       |
-| `pnpm test`      | Unit tests in every workspace package/app (`packages/circuit-engine` and `packages/component-library` have full Jest suites at 100% coverage as of Phases 2–3; `apps/web` and `packages/design-system` don't have tests yet, so they no-op) |
-| `pnpm format`    | Prettier `--write` across the repo                                                                                                                                                                                                          |
+| Command          | What it does                                                                                                                                                                                                                                                                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`       | Start every app's dev server (today: just `apps/web`)                                                                                                                                                                                                                                                                                                    |
+| `pnpm build`     | Production build of every workspace package/app                                                                                                                                                                                                                                                                                                          |
+| `pnpm typecheck` | `tsc --noEmit` in every workspace package/app                                                                                                                                                                                                                                                                                                            |
+| `pnpm lint`      | ESLint in every workspace package/app                                                                                                                                                                                                                                                                                                                    |
+| `pnpm test`      | Unit tests in every workspace package/app (`packages/circuit-engine` and `packages/component-library` have full Jest suites at 100% coverage as of Phases 2–3; `apps/web` has a Jest suite scoped to `features/*/model/**` as of Phase 4 — not coverage-enforced, since it's UI-adjacent glue, not physics; `packages/design-system` still has no tests) |
+| `pnpm format`    | Prettier `--write` across the repo                                                                                                                                                                                                                                                                                                                       |
 
 All of the above are `turbo run <task>` under the hood: Turborepo looks at
 every `package.json` in `apps/*` and `packages/*`, runs `<task>` in the
@@ -44,27 +46,51 @@ ones that define a matching script, and skips the rest — so adding a new
 package with (say) a `test` script is enough to have it picked up by
 `pnpm test` with no config changes.
 
-## Repo layout (as of Phase 3 — Component library v1)
+## Repo layout (as of Phase 4 — Breadboard Lab UI)
 
 ```
 ds-simboard/
 ├── apps/
-│   └── web/                 Next.js app (landing page + simulator shell)
-│       ├── app/              Routes only
-│       ├── components/       landing/, simulator/ — feature UI, not yet
-│       │                     split into apps/web/features/ (that
-│       │                     restructure is deferred to whichever phase
-│       │                     first needs feature isolation, per the
-│       │                     Phase 1 report)
+│   └── web/                 Next.js app
+│       ├── app/              Routes only: /, /simulator, /breadboard-lab
+│       ├── components/       landing/, simulator/ — the *existing*
+│       │                     Arduino/ESP32 simulator's feature UI, not
+│       │                     yet split into apps/web/features/ (still
+│       │                     deferred, per the Phase 1 report — but see
+│       │                     features/breadboard-lab/ below, which *is*
+│       │                     the Part 4 features/ pattern, for the new
+│       │                     Phase 4 UI specifically)
+│       ├── features/
+│       │   └── breadboard-lab/   The Phase 4 UI — the first thing wired to
+│       │                         circuit-engine + component-library:
+│       │                         ├── model/       Pure, framework-agnostic
+│       │                         │                logic (build the graph
+│       │                         │                from placed components +
+│       │                         │                wires, resolve bias
+│       │                         │                direction from topology,
+│       │                         │                solve, derive every
+│       │                         │                component's health/
+│       │                         │                visual) — has its own
+│       │                         │                Jest suite, no DOM needed
+│       │                         ├── components/  React pieces (holes,
+│       │                         │                component glyphs,
+│       │                         │                palette, inspector)
+│       │                         └── BreadboardLab.tsx   Stateful container
+│       │                         See docs/architecture/0006-*.md for the
+│       │                         scope decisions made building this (no
+│       │                         Battery component; free-form wiring with
+│       │                         an explicit "not supported yet" state;
+│       │                         capacitor/transistor not wireable yet).
 │       └── lib/simulation/   The current sketch interpreter (SketchEngine)
 │                             — a deliberately simple line-stepping
 │                             interpreter, NOT the real chip emulator.
 │                             Read lib/simulation/engine.ts's docstring
 │                             before extending it. This becomes
-│                             packages/chip-emulation in Phase 5. Also not
-│                             yet wired to packages/circuit-engine or
-│                             packages/component-library below — that
-│                             integration is Phase 4 work.
+│                             packages/chip-emulation in Phase 5. Still not
+│                             wired to circuit-engine/component-library —
+│                             the existing Arduino/ESP32 simulator and the
+│                             new Breadboard Lab are separate UIs for now,
+│                             matching spec Part 3's "three labs" framing.
 ├── packages/
 │   ├── design-system/        DS Inventek tokens + Button/Container/
 │   │                         ScrollReveal, shared by every app in the
@@ -121,9 +147,7 @@ ds-simboard/
 `packages/chip-emulation`, `packages/shared-types`, and `apps/api` from the
 target architecture in spec Part 4 don't exist yet — they land in Phase 5,
 (introduced alongside whichever package first needs shared types), and
-Phase 8 respectively. Don't be surprised not to find them. Also note
-`packages/component-library` isn't wired into `apps/web`'s simulator UI
-yet — that's Phase 4 (Breadboard Lab UI).
+Phase 8 respectively. Don't be surprised not to find them.
 
 ## Code style
 

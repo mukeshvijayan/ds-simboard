@@ -4,6 +4,7 @@ import { Button, Container } from "@ds-simboard/design-system";
 const NAV_LINKS = [
   { label: "Boards", href: "#boards" },
   { label: "How it works", href: "#how-it-works" },
+  { label: "Breadboard Lab", href: "/breadboard-lab" },
   { label: "Simulator", href: "/simulator" },
 ];
 
