@@ -29,16 +29,23 @@ pnpm dev
 simulator shell, `/breadboard-lab` is the Phase 4 Breadboard Lab (the first
 UI wired to `circuit-engine` + `component-library`).
 
+`apps/api` (Phase 8, the backend) isn't wired into `pnpm dev` yet — it has
+no dev server startup script beyond `pnpm --filter @ds-simboard/api dev`
+(runs `tsx watch src/server.ts`), and doing so requires a real
+`DATABASE_URL` (see `apps/api/.env.example`), which isn't needed for its
+own tests — those run against an embedded database. See
+docs/architecture/0009-*.md.
+
 ## Common commands (run from the repo root)
 
-| Command          | What it does                                                                                                                                                                                                                                                                                                                                             |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`       | Start every app's dev server (today: just `apps/web`)                                                                                                                                                                                                                                                                                                    |
-| `pnpm build`     | Production build of every workspace package/app                                                                                                                                                                                                                                                                                                          |
-| `pnpm typecheck` | `tsc --noEmit` in every workspace package/app                                                                                                                                                                                                                                                                                                            |
-| `pnpm lint`      | ESLint in every workspace package/app                                                                                                                                                                                                                                                                                                                    |
-| `pnpm test`      | Unit tests in every workspace package/app (`packages/circuit-engine` and `packages/component-library` have full Jest suites at 100% coverage as of Phases 2–3; `apps/web` has a Jest suite scoped to `features/*/model/**` as of Phase 4 — not coverage-enforced, since it's UI-adjacent glue, not physics; `packages/design-system` still has no tests) |
-| `pnpm format`    | Prettier `--write` across the repo                                                                                                                                                                                                                                                                                                                       |
+| Command          | What it does                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`       | Start every app's dev server (today: just `apps/web`)                                                                                                                                                                                                                                                                                                                                                                  |
+| `pnpm build`     | Production build of every workspace package/app                                                                                                                                                                                                                                                                                                                                                                        |
+| `pnpm typecheck` | `tsc --noEmit` in every workspace package/app                                                                                                                                                                                                                                                                                                                                                                          |
+| `pnpm lint`      | ESLint in every workspace package/app                                                                                                                                                                                                                                                                                                                                                                                  |
+| `pnpm test`      | Unit tests in every workspace package/app (`packages/circuit-engine`, `packages/component-library`, `packages/chip-emulation`, and `apps/api` all have full Jest suites at 100% coverage; `apps/web` has a Jest suite scoped to `features/*/model/**` and `lib/simulation/**` — not coverage-enforced, since it's UI-adjacent glue, not physics; `packages/design-system`/`packages/shared-types` still have no tests) |
+| `pnpm format`    | Prettier `--write` across the repo                                                                                                                                                                                                                                                                                                                                                                                     |
 
 All of the above are `turbo run <task>` under the hood: Turborepo looks at
 every `package.json` in `apps/*` and `packages/*`, runs `<task>` in the
@@ -46,7 +53,7 @@ ones that define a matching script, and skips the rest — so adding a new
 package with (say) a `test` script is enough to have it picked up by
 `pnpm test` with no config changes.
 
-## Repo layout (as of Phase 7 — ESP32 Lab)
+## Repo layout (as of Phase 8 — Backend & persistence)
 
 ```
 ds-simboard/
@@ -186,10 +193,31 @@ ds-simboard/
                               package's tsconfig.json extends this
 ```
 
-`packages/shared-types` and `apps/api` from the target architecture in
-spec Part 4 don't exist yet — they land alongside whichever package first
-needs shared types, and in Phase 8, respectively. Don't be surprised not
-to find them.
+**`packages/shared-types`** (new this phase) holds the DTOs both
+`apps/web` and `apps/api` can share (`Project`, `CircuitSnapshot`,
+`ComponentDefinition`, `User`) — plain TypeScript interfaces, no runtime
+code, no tests (nothing to test).
+
+**`apps/api`** (new this phase, spec Phase 8) is a plain Express app —
+not a Next.js Route Handler, deliberately (see docs/architecture/0009-*.md)
+— with a real `controllers/ → services/ → repositories/ → db/` layering:
+
+- `db/schema.ts` — Drizzle schema for `users`, `projects`,
+  `circuit_snapshots`, `component_definitions`; `db/migrations/` holds the
+  actual generated SQL (`pnpm --filter @ds-simboard/api db:generate` to
+  regenerate after editing the schema).
+- Every layer is tested against `@electric-sql/pglite` — a real, embedded
+  Postgres, not a mock — including that the _actual_ migration files
+  apply cleanly and that constraints (foreign keys, uniqueness) are
+  genuinely enforced by the database. 100% coverage, same bar as
+  circuit-engine/component-library/chip-emulation.
+- **What's still missing, and why:** a real production `DATABASE_URL` —
+  see `apps/api/.env.example`. No hosting provider has been chosen; that's
+  a product/cost decision for the project owner. `db/client.ts`'s
+  production path (`createProductionDatabase`) is untested against a real
+  server for exactly this reason.
+- No password/session fields on `users` yet — spec Phase 9 decides how
+  auth actually works, deliberately not preempted here.
 
 ## Code style
 

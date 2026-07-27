@@ -1,0 +1,36 @@
+{
+  "name": "@ds-simboard/api",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/server.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "db:generate": "drizzle-kit generate",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@ds-simboard/shared-types": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^20.14.10",
+    "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
+  }
+}
