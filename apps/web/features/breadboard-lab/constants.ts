@@ -3,12 +3,17 @@ import type {
   BatteryHolderParams,
   BuzzerParams,
   DcMotorParams,
+  Dht11Params,
   DiodeParams,
   LdrParams,
   LedParams,
+  MotionSensorParams,
   PotentiometerParams,
   PushbuttonParams,
+  RainSensorParams,
   ResistorParams,
+  SoilMoistureSensorParams,
+  SoundSensorParams,
 } from "@ds-simboard/component-library";
 import type { BreadboardComponentType } from "./model/types";
 
@@ -32,6 +37,11 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   dcMotor: "DC Motor",
   ldr: "Light Sensor (LDR)",
   batteryHolder: "Battery Holder",
+  motionSensor: "Motion Sensor (PIR)",
+  soilMoistureSensor: "Soil Moisture Sensor",
+  rainSensor: "Rain Sensor",
+  soundSensor: "Sound Sensor",
+  dht11: "Temperature & Humidity Sensor (DHT11)",
 };
 
 /**
@@ -51,7 +61,17 @@ export type PartPreset =
   | { id: string; type: "buzzer"; label: string; params: BuzzerParams }
   | { id: string; type: "dcMotor"; label: string; params: DcMotorParams }
   | { id: string; type: "ldr"; label: string; params: LdrParams }
-  | { id: string; type: "batteryHolder"; label: string; params: BatteryHolderParams };
+  | { id: string; type: "batteryHolder"; label: string; params: BatteryHolderParams }
+  | { id: string; type: "motionSensor"; label: string; params: MotionSensorParams }
+  | {
+      id: string;
+      type: "soilMoistureSensor";
+      label: string;
+      params: SoilMoistureSensorParams;
+    }
+  | { id: string; type: "rainSensor"; label: string; params: RainSensorParams }
+  | { id: string; type: "soundSensor"; label: string; params: SoundSensorParams }
+  | { id: string; type: "dht11"; label: string; params: Dht11Params };
 
 /** Real-world typical forward voltages per spec Part 2.2. */
 const LED_PRESETS: PartPreset[] = [
@@ -206,6 +226,36 @@ export const PART_PRESETS: PartPreset[] = [
     type: "batteryHolder",
     label: "Battery Holder",
     params: {},
+  },
+  {
+    id: "motion-sensor",
+    type: "motionSensor",
+    label: "Motion Sensor (PIR)",
+    params: {},
+  },
+  {
+    id: "soil-moisture-sensor",
+    type: "soilMoistureSensor",
+    label: "Soil Moisture Sensor",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "rain-sensor",
+    type: "rainSensor",
+    label: "Rain Sensor",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "sound-sensor",
+    type: "soundSensor",
+    label: "Sound Sensor",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "dht11",
+    type: "dht11",
+    label: "Temperature & Humidity Sensor (DHT11)",
+    params: { operatingCurrentAmps: 0.0025 },
   },
 ];
 

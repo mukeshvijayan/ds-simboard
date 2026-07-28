@@ -8,31 +8,46 @@ import {
   batteryHolderSeriesElement,
   buzzerSeriesElement,
   dcMotorSeriesElement,
+  dht11SeriesElement,
   diodeSeriesElement,
   evaluateBatteryHolder,
   evaluateBuzzer,
   evaluateDcMotor,
+  evaluateDht11,
   evaluateDiode,
   evaluateLdr,
   evaluateLed,
+  evaluateMotionSensor,
   evaluatePotentiometer,
   evaluatePushbutton,
+  evaluateRainSensor,
   evaluateResistor,
+  evaluateSoilMoistureSensor,
+  evaluateSoundSensor,
   ledSeriesElement,
   ldrSeriesElement,
+  motionSensorSeriesElement,
   potentiometerSeriesElement,
   pushbuttonSeriesElement,
+  rainSensorSeriesElement,
   resistorSeriesElement,
+  soilMoistureSensorSeriesElement,
+  soundSensorSeriesElement,
   type BatteryHolderVisual,
   type BuzzerVisual,
   type DcMotorVisual,
+  type Dht11Visual,
   type DiodeVisual,
   type LdrVisual,
   type LedVisual,
   type HealthState,
+  type MotionSensorVisual,
   type PotentiometerVisual,
   type PushbuttonVisual,
+  type RainSensorVisual,
   type ResistorVisual,
+  type SoilMoistureSensorVisual,
+  type SoundSensorVisual,
 } from "@ds-simboard/component-library";
 import { buildBreadboard, buildCircuitGraph, SUPPLY_ELEMENT_ID } from "./circuitGraph";
 import { physicalEntryNode, resolveBias } from "./bias";
@@ -47,7 +62,12 @@ export type ComponentVisual =
   | BuzzerVisual
   | DcMotorVisual
   | LdrVisual
-  | BatteryHolderVisual;
+  | BatteryHolderVisual
+  | MotionSensorVisual
+  | SoilMoistureSensorVisual
+  | RainSensorVisual
+  | SoundSensorVisual
+  | Dht11Visual;
 
 export interface ComponentResult {
   health: HealthState;
@@ -79,7 +99,12 @@ type NonPolarizedComponent = Extract<
       | "buzzer"
       | "dcMotor"
       | "ldr"
-      | "batteryHolder";
+      | "batteryHolder"
+      | "motionSensor"
+      | "soilMoistureSensor"
+      | "rainSensor"
+      | "soundSensor"
+      | "dht11";
   }
 >;
 type PolarizedComponent = Extract<PlacedComponent, { type: "led" | "diode" }>;
@@ -142,6 +167,49 @@ function evaluateComponent(
       const result = evaluateBatteryHolder(
         component.params,
         { supplyVoltageVolts },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "motionSensor": {
+      const result = evaluateMotionSensor(
+        component.params,
+        { motionDetected: component.motionDetected },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "soilMoistureSensor": {
+      const result = evaluateSoilMoistureSensor(
+        component.params,
+        { wetness: component.wetness },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "rainSensor": {
+      const result = evaluateRainSensor(
+        component.params,
+        { rainLevel: component.rainLevel },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "soundSensor": {
+      const result = evaluateSoundSensor(
+        component.params,
+        { loudness: component.loudness },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "dht11": {
+      const result = evaluateDht11(
+        component.params,
+        {
+          simulatedTemperatureCelsius: component.simulatedTemperatureCelsius,
+          simulatedHumidityPercent: component.simulatedHumidityPercent,
+        },
         { health: component.health }
       );
       return { health: result.health, visual: result.visual };
@@ -252,6 +320,16 @@ export function resolveCircuit(
         return ldrSeriesElement(component.params, component.lightLevel);
       case "batteryHolder":
         return batteryHolderSeriesElement();
+      case "motionSensor":
+        return motionSensorSeriesElement(component.motionDetected);
+      case "soilMoistureSensor":
+        return soilMoistureSensorSeriesElement(component.params, component.wetness);
+      case "rainSensor":
+        return rainSensorSeriesElement(component.params, component.rainLevel);
+      case "soundSensor":
+        return soundSensorSeriesElement(component.params, component.loudness);
+      case "dht11":
+        return dht11SeriesElement(component.params);
       case "led":
         return ledSeriesElement(
           component.params,

@@ -84,6 +84,52 @@ function createComponent(
       };
     case "batteryHolder":
       return { id, type: preset.type, params: preset.params, leads, health };
+    case "motionSensor":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        motionDetected: false,
+        health,
+      };
+    case "soilMoistureSensor":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        wetness: 0.5,
+        health,
+      };
+    case "rainSensor":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        rainLevel: 0.5,
+        health,
+      };
+    case "soundSensor":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        loudness: 0.5,
+        health,
+      };
+    case "dht11":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        simulatedTemperatureCelsius: 24,
+        simulatedHumidityPercent: 50,
+        health,
+      };
   }
 }
 
@@ -174,6 +220,52 @@ export function BreadboardLab() {
     );
   }
 
+  function handleMotionToggle(id: string) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "motionSensor"
+          ? { ...c, motionDetected: !c.motionDetected }
+          : c
+      )
+    );
+  }
+
+  function handleWetnessChange(id: string, wetness: number) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "soilMoistureSensor" ? { ...c, wetness } : c
+      )
+    );
+  }
+
+  function handleRainLevelChange(id: string, rainLevel: number) {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === id && c.type === "rainSensor" ? { ...c, rainLevel } : c))
+    );
+  }
+
+  function handleLoudnessChange(id: string, loudness: number) {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === id && c.type === "soundSensor" ? { ...c, loudness } : c))
+    );
+  }
+
+  function handleTemperatureChange(id: string, simulatedTemperatureCelsius: number) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "dht11" ? { ...c, simulatedTemperatureCelsius } : c
+      )
+    );
+  }
+
+  function handleHumidityChange(id: string, simulatedHumidityPercent: number) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "dht11" ? { ...c, simulatedHumidityPercent } : c
+      )
+    );
+  }
+
   function handleReset() {
     setComponents([]);
     setWires([]);
@@ -252,6 +344,12 @@ export function BreadboardLab() {
             onTogglePressed={handleTogglePressed}
             onWiperChange={handleWiperChange}
             onLightLevelChange={handleLightLevelChange}
+            onMotionToggle={handleMotionToggle}
+            onWetnessChange={handleWetnessChange}
+            onRainLevelChange={handleRainLevelChange}
+            onLoudnessChange={handleLoudnessChange}
+            onTemperatureChange={handleTemperatureChange}
+            onHumidityChange={handleHumidityChange}
             onRemove={handleRemove}
           />
         </div>

@@ -42,6 +42,21 @@ function glyphColor(
   if (component.type === "batteryHolder") {
     return "#2F6E4F";
   }
+  if (component.type === "motionSensor") {
+    return component.motionDetected ? "#C9A63B" : "#6B6350";
+  }
+  if (component.type === "soilMoistureSensor") {
+    return component.wetness > 0.5 ? "#3B6FD6" : "#8A7A5C";
+  }
+  if (component.type === "rainSensor") {
+    return component.rainLevel > 0.5 ? "#3B6FD6" : "#8A7A5C";
+  }
+  if (component.type === "soundSensor") {
+    return component.loudness > 0.5 ? "#C9A63B" : "#6B6350";
+  }
+  if (component.type === "dht11") {
+    return "#4C7A8A";
+  }
   return "#3B4C70";
 }
 

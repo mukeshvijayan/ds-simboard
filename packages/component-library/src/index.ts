@@ -91,6 +91,56 @@ export type {
   BatteryHolderVisual,
 } from "./components/batteryHolder/batteryHolder";
 
+export {
+  evaluateMotionSensor,
+  motionSensorSeriesElement,
+  motionSensorModel,
+} from "./components/motionSensor/motionSensor";
+export type {
+  MotionSensorParams,
+  MotionSensorInput,
+  MotionSensorVisual,
+} from "./components/motionSensor/motionSensor";
+
+export {
+  evaluateSoilMoistureSensor,
+  soilMoistureSensorSeriesElement,
+  effectiveSoilMoistureResistance,
+  soilMoistureSensorModel,
+} from "./components/soilMoistureSensor/soilMoistureSensor";
+export type {
+  SoilMoistureSensorParams,
+  SoilMoistureSensorInput,
+  SoilMoistureSensorVisual,
+} from "./components/soilMoistureSensor/soilMoistureSensor";
+
+export {
+  evaluateRainSensor,
+  rainSensorSeriesElement,
+  effectiveRainResistance,
+  rainSensorModel,
+} from "./components/rainSensor/rainSensor";
+export type {
+  RainSensorParams,
+  RainSensorInput,
+  RainSensorVisual,
+} from "./components/rainSensor/rainSensor";
+
+export {
+  evaluateSoundSensor,
+  soundSensorSeriesElement,
+  effectiveSoundResistance,
+  soundSensorModel,
+} from "./components/soundSensor/soundSensor";
+export type {
+  SoundSensorParams,
+  SoundSensorInput,
+  SoundSensorVisual,
+} from "./components/soundSensor/soundSensor";
+
+export { evaluateDht11, dht11SeriesElement, dht11Model } from "./components/dht11/dht11";
+export type { Dht11Params, Dht11Input, Dht11Visual } from "./components/dht11/dht11";
+
 export { evaluateCapacitor, capacitorModel } from "./components/capacitor/capacitor";
 export type {
   CapacitorParams,

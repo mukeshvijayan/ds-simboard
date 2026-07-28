@@ -260,6 +260,124 @@ describe("resolveCircuit — battery holder as a transparent pass-through", () =
   });
 });
 
+describe("resolveCircuit — PIR motion sensor as a digital presence switch", () => {
+  it("conducts only when motion is detected, exactly like a closed pushbutton", () => {
+    const buildComponents = (motionDetected: boolean): PlacedComponent[] => [
+      resistor("r1", [POSITIVE_RAIL, STRIP_1]),
+      {
+        id: "pir1",
+        type: "motionSensor",
+        params: {},
+        leads: [STRIP_1, NEGATIVE_RAIL],
+        motionDetected,
+        health: { status: "nominal" },
+      },
+    ];
+    const noMotion = resolveCircuit(30, buildComponents(false), [], 5);
+    const motion = resolveCircuit(30, buildComponents(true), [], 5);
+    expect(noMotion.status).toBe("non-conducting");
+    expect(motion.status).toBe("conducting");
+    if (motion.status !== "conducting") return;
+    expect(motion.currentAmps).toBeCloseTo(5 / 220);
+  });
+});
+
+describe("resolveCircuit — soil moisture sensor as a wetness-controlled variable resistor", () => {
+  it("draws more current when simulated soil is wetter", () => {
+    const buildComponents = (wetness: number): PlacedComponent[] => [
+      {
+        id: "soil1",
+        type: "soilMoistureSensor",
+        params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        wetness,
+        health: { status: "nominal" },
+      },
+    ];
+    const dry = resolveCircuit(30, buildComponents(0), [], 5);
+    const wet = resolveCircuit(30, buildComponents(1), [], 5);
+    expect(dry.status).toBe("conducting");
+    expect(wet.status).toBe("conducting");
+    if (dry.status !== "conducting" || wet.status !== "conducting") return;
+    expect(wet.currentAmps).toBeGreaterThan(dry.currentAmps);
+  });
+});
+
+describe("resolveCircuit — rain sensor as a rainfall-controlled variable resistor", () => {
+  it("draws more current in simulated heavy rain than when dry", () => {
+    const buildComponents = (rainLevel: number): PlacedComponent[] => [
+      {
+        id: "rain1",
+        type: "rainSensor",
+        params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        rainLevel,
+        health: { status: "nominal" },
+      },
+    ];
+    const dry = resolveCircuit(30, buildComponents(0), [], 5);
+    const raining = resolveCircuit(30, buildComponents(1), [], 5);
+    expect(dry.status).toBe("conducting");
+    expect(raining.status).toBe("conducting");
+    if (dry.status !== "conducting" || raining.status !== "conducting") return;
+    expect(raining.currentAmps).toBeGreaterThan(dry.currentAmps);
+  });
+});
+
+describe("resolveCircuit — sound sensor as a loudness-controlled variable resistor", () => {
+  it("draws more current when simulated loudness is higher", () => {
+    const buildComponents = (loudness: number): PlacedComponent[] => [
+      {
+        id: "sound1",
+        type: "soundSensor",
+        params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        loudness,
+        health: { status: "nominal" },
+      },
+    ];
+    const quiet = resolveCircuit(30, buildComponents(0), [], 5);
+    const loud = resolveCircuit(30, buildComponents(1), [], 5);
+    expect(quiet.status).toBe("conducting");
+    expect(loud.status).toBe("conducting");
+    if (quiet.status !== "conducting" || loud.status !== "conducting") return;
+    expect(loud.currentAmps).toBeGreaterThan(quiet.currentAmps);
+  });
+});
+
+describe("resolveCircuit — DHT11 as a fixed-current digital sensor load", () => {
+  it("draws the same fixed current regardless of its simulated temperature/humidity readings", () => {
+    const buildComponents = (
+      simulatedTemperatureCelsius: number,
+      simulatedHumidityPercent: number
+    ): PlacedComponent[] => [
+      {
+        id: "dht1",
+        type: "dht11",
+        params: { operatingCurrentAmps: 0.0025 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        simulatedTemperatureCelsius,
+        simulatedHumidityPercent,
+        health: { status: "nominal" },
+      },
+    ];
+    const cool = resolveCircuit(30, buildComponents(10, 20), [], 5);
+    const hot = resolveCircuit(30, buildComponents(40, 90), [], 5);
+    expect(cool.status).toBe("conducting");
+    expect(hot.status).toBe("conducting");
+    if (cool.status !== "conducting" || hot.status !== "conducting") return;
+    expect(cool.currentAmps).toBeCloseTo(hot.currentAmps);
+    expect(
+      (hot.componentResults.get("dht1")?.visual as { temperatureCelsius: number })
+        .temperatureCelsius
+    ).toBe(40);
+    expect(
+      (hot.componentResults.get("dht1")?.visual as { humidityPercent: number })
+        .humidityPercent
+    ).toBe(90);
+  });
+});
+
 describe("resolveCircuit — unsupported topology", () => {
   it("reports an explicit unsupported-topology status for a parallel branch, instead of crashing or mis-solving", () => {
     // Two resistors both wired straight across the rails — a branch, not a series loop.

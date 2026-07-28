@@ -10,6 +10,12 @@ export function Inspector({
   onTogglePressed,
   onWiperChange,
   onLightLevelChange,
+  onMotionToggle,
+  onWetnessChange,
+  onRainLevelChange,
+  onLoudnessChange,
+  onTemperatureChange,
+  onHumidityChange,
   onRemove,
 }: {
   component: PlacedComponent | null;
@@ -17,6 +23,12 @@ export function Inspector({
   onTogglePressed: (id: string) => void;
   onWiperChange: (id: string, wiperPosition: number) => void;
   onLightLevelChange: (id: string, lightLevel: number) => void;
+  onMotionToggle: (id: string) => void;
+  onWetnessChange: (id: string, wetness: number) => void;
+  onRainLevelChange: (id: string, rainLevel: number) => void;
+  onLoudnessChange: (id: string, loudness: number) => void;
+  onTemperatureChange: (id: string, simulatedTemperatureCelsius: number) => void;
+  onHumidityChange: (id: string, simulatedHumidityPercent: number) => void;
   onRemove: (id: string) => void;
 }) {
   if (!component) {
@@ -133,6 +145,65 @@ export function Inspector({
             </dd>
           </div>
         )}
+
+        {component.type === "motionSensor" && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Motion</dt>
+            <dd>{component.motionDetected ? "Detected" : "None"}</dd>
+          </div>
+        )}
+
+        {component.type === "soilMoistureSensor" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Resistance</dt>
+            <dd>
+              {Math.round(
+                (result.visual as { effectiveResistanceOhms: number })
+                  .effectiveResistanceOhms
+              ).toLocaleString()}
+              Ω
+            </dd>
+          </div>
+        )}
+
+        {component.type === "rainSensor" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Resistance</dt>
+            <dd>
+              {Math.round(
+                (result.visual as { effectiveResistanceOhms: number })
+                  .effectiveResistanceOhms
+              ).toLocaleString()}
+              Ω
+            </dd>
+          </div>
+        )}
+
+        {component.type === "soundSensor" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Resistance</dt>
+            <dd>
+              {Math.round(
+                (result.visual as { effectiveResistanceOhms: number })
+                  .effectiveResistanceOhms
+              ).toLocaleString()}
+              Ω
+            </dd>
+          </div>
+        )}
+
+        {component.type === "dht11" && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Temperature</dt>
+              <dd>{component.simulatedTemperatureCelsius}°C</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Humidity</dt>
+              <dd>{component.simulatedHumidityPercent}%</dd>
+            </div>
+          </>
+        )}
       </dl>
 
       {component.type === "pushbutton" && (
@@ -181,6 +252,91 @@ export function Inspector({
             onChange={(e) => onLightLevelChange(component.id, Number(e.target.value))}
           />
         </label>
+      )}
+
+      {component.type === "motionSensor" && (
+        <button
+          type="button"
+          onClick={() => onMotionToggle(component.id)}
+          className={`rounded-sm border px-3 py-2 text-[13.5px] transition-colors ${
+            component.motionDetected
+              ? "border-navy bg-navy text-ivory"
+              : "border-hairline bg-white text-charcoal"
+          }`}
+        >
+          {component.motionDetected
+            ? "Motion detected (click to clear)"
+            : "No motion (click to trigger)"}
+        </button>
+      )}
+
+      {component.type === "soilMoistureSensor" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated soil wetness
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.wetness}
+            onChange={(e) => onWetnessChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "rainSensor" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated rain level
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.rainLevel}
+            onChange={(e) => onRainLevelChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "soundSensor" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated loudness
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.loudness}
+            onChange={(e) => onLoudnessChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "dht11" && (
+        <>
+          <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+            Simulated temperature (°C)
+            <input
+              type="range"
+              min={-10}
+              max={50}
+              step={1}
+              value={component.simulatedTemperatureCelsius}
+              onChange={(e) => onTemperatureChange(component.id, Number(e.target.value))}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+            Simulated humidity (%)
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={component.simulatedHumidityPercent}
+              onChange={(e) => onHumidityChange(component.id, Number(e.target.value))}
+            />
+          </label>
+        </>
       )}
 
       <button
