@@ -6,6 +6,7 @@ import {
   DEFAULT_SUPPLY_VOLTAGE,
   NOMINAL_HEALTH,
   PART_PRESETS,
+  presetLeadNames,
 } from "./constants";
 import { DesktopOnlyNotice } from "@/components/shared/DesktopOnlyNotice";
 import { CanvasSurface } from "./components/CanvasSurface";
@@ -15,8 +16,14 @@ import { Inspector } from "./components/Inspector";
 import { StatusBanner } from "./components/StatusBanner";
 import type { InteractionMode } from "./model/interactionMode";
 import type { ConnectionPointRef } from "./model/connectionPoint";
-import { resolveCircuit } from "./model/resolveCircuit";
-import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./model/types";
+import { componentHealthEquals, resolveCircuit } from "./model/resolveCircuit";
+import { SEVEN_SEGMENT_NAMES } from "./model/types";
+import type {
+  CanvasWireModel,
+  PlacedBreadboard,
+  PlacedComponent,
+  SevenSegmentName,
+} from "./model/types";
 import { INITIAL_VIEWPORT, type CanvasViewport } from "./model/viewport";
 
 let nextId = 1;
@@ -31,7 +38,7 @@ const DEFAULT_BREADBOARD: PlacedBreadboard = {
 
 function createComponent(
   presetId: string,
-  leads: [ConnectionPointRef, ConnectionPointRef]
+  points: ConnectionPointRef[]
 ): PlacedComponent {
   const preset = PART_PRESETS.find((p) => p.id === presetId);
   if (!preset) {
@@ -39,6 +46,39 @@ function createComponent(
   }
   const id = `${preset.type}-${nextId++}`;
   const health = NOMINAL_HEALTH;
+
+  if (preset.type === "rgbLed") {
+    const [commonLead, redLead, greenLead, blueLead] = points;
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      commonLead,
+      redLead,
+      greenLead,
+      blueLead,
+      health: { red: health, green: health, blue: health },
+    };
+  }
+  if (preset.type === "sevenSegmentDisplay") {
+    const [commonLead, ...segmentPoints] = points;
+    const segmentLeads = {} as Record<SevenSegmentName, ConnectionPointRef>;
+    const segmentHealth = {} as Record<SevenSegmentName, typeof health>;
+    SEVEN_SEGMENT_NAMES.forEach((name, index) => {
+      segmentLeads[name] = segmentPoints[index];
+      segmentHealth[name] = health;
+    });
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      commonLead,
+      segmentLeads,
+      health: segmentHealth,
+    };
+  }
+
+  const leads = points as [ConnectionPointRef, ConnectionPointRef];
   switch (preset.type) {
     case "resistor":
       return { id, type: preset.type, params: preset.params, leads, health };
@@ -161,12 +201,14 @@ export function Simulator() {
   // Health latches inside resolveCircuit's per-tick output — persist any
   // newly-changed health back into component state so it survives the
   // *next* resolve, same "failed stays failed" contract as Breadboard Lab.
+  // `componentHealthEquals` handles both a plain HealthState and a
+  // multi-lead part's per-channel health record (P2-2).
   useEffect(() => {
     setComponents((prev) => {
       let changed = false;
       const next = prev.map((c) => {
         const updated = result.componentResults.get(c.id);
-        if (updated && updated.health.status !== c.health.status) {
+        if (updated && !componentHealthEquals(updated.health, c.health)) {
           changed = true;
           return { ...c, health: updated.health } as PlacedComponent;
         }
@@ -180,14 +222,14 @@ export function Simulator() {
     if (mode.kind === "idle") return;
 
     if (mode.kind === "placing") {
-      if (!mode.firstPoint) {
-        setMode({ ...mode, firstPoint: point });
+      const preset = PART_PRESETS.find((p) => p.id === mode.presetId);
+      const neededLeads = preset ? presetLeadNames(preset).length : 2;
+      const collectedPoints = [...mode.collectedPoints, point];
+      if (collectedPoints.length < neededLeads) {
+        setMode({ ...mode, collectedPoints });
         return;
       }
-      setComponents((prev) => [
-        ...prev,
-        createComponent(mode.presetId, [mode.firstPoint as ConnectionPointRef, point]),
-      ]);
+      setComponents((prev) => [...prev, createComponent(mode.presetId, collectedPoints)]);
       setMode({ kind: "idle" });
       return;
     }
@@ -290,10 +332,12 @@ export function Simulator() {
     setSelectedComponentId(null);
   }
 
-  const pendingPoint =
-    (mode.kind === "placing" || mode.kind === "wiring") && mode.firstPoint
-      ? mode.firstPoint
-      : null;
+  const pendingPoints: ConnectionPointRef[] =
+    mode.kind === "placing"
+      ? mode.collectedPoints
+      : mode.kind === "wiring" && mode.firstPoint
+        ? [mode.firstPoint]
+        : [];
 
   const selectedComponent = components.find((c) => c.id === selectedComponentId) ?? null;
 
@@ -330,7 +374,9 @@ export function Simulator() {
         <div className="flex flex-1 overflow-hidden">
           <PartsPalette
             mode={mode}
-            onStartPlacing={(presetId) => setMode({ kind: "placing", presetId })}
+            onStartPlacing={(presetId) =>
+              setMode({ kind: "placing", presetId, collectedPoints: [] })
+            }
             onStartWiring={() => setMode({ kind: "wiring" })}
             onCancel={() => setMode({ kind: "idle" })}
           />
@@ -348,7 +394,7 @@ export function Simulator() {
                   components={components}
                   wires={wires}
                   componentResults={result.componentResults}
-                  pendingPoint={pendingPoint}
+                  pendingPoints={pendingPoints}
                   selectedComponentId={selectedComponentId}
                   viewportScale={viewport.scale}
                   onHoleClick={handlePointClick}

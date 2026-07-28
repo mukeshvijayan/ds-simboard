@@ -165,3 +165,181 @@ describe("buildCircuit — two breadboards", () => {
     expect(result.graph.allElements).toHaveLength(1);
   });
 });
+
+describe("buildCircuit — multi-lead components (P2-2)", () => {
+  const ledParams = {
+    forwardVoltageVolts: 2,
+    ratedCurrentAmps: 0.02,
+    maxCurrentAmps: 0.03,
+    color: "red" as const,
+  };
+
+  it("orients a common-cathode RGB LED's channels anode-toward-the-channel-lead", () => {
+    const bb = breadboard("bb1");
+    const rgbLed: PlacedComponent = {
+      id: "rgb1",
+      type: "rgbLed",
+      params: {
+        commonTerminal: "cathode",
+        red: ledParams,
+        green: ledParams,
+        blue: ledParams,
+      },
+      commonLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "rail", rail: "top-negative" },
+      },
+      redLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 1 },
+      },
+      greenLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 2 },
+      },
+      blueLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 3 },
+      },
+      health: {
+        red: { status: "nominal" },
+        green: { status: "nominal" },
+        blue: { status: "nominal" },
+      },
+    };
+    const result = buildCircuit([bb], [rgbLed], []);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+
+    const redElement = result.graph.getElement("rgb1:red");
+    const commonNode = result.graph.getElement(`${SUPPLY_ELEMENT_PREFIX}bb1`)?.nodeB;
+    expect(redElement?.nodeB).toBe(commonNode); // cathode is the shared common leg
+    expect(redElement?.nodeA).not.toBe(commonNode); // anode is the channel's own lead
+  });
+
+  it("orients a common-anode RGB LED's channels the opposite way", () => {
+    const bb = breadboard("bb1");
+    const rgbLed: PlacedComponent = {
+      id: "rgb1",
+      type: "rgbLed",
+      params: {
+        commonTerminal: "anode",
+        red: ledParams,
+        green: ledParams,
+        blue: ledParams,
+      },
+      commonLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "rail", rail: "top-positive" },
+      },
+      redLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 1 },
+      },
+      greenLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 2 },
+      },
+      blueLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 3 },
+      },
+      health: {
+        red: { status: "nominal" },
+        green: { status: "nominal" },
+        blue: { status: "nominal" },
+      },
+    };
+    const result = buildCircuit([bb], [rgbLed], []);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+
+    const redElement = result.graph.getElement("rgb1:red");
+    const commonNode = result.graph.getElement(`${SUPPLY_ELEMENT_PREFIX}bb1`)?.nodeA;
+    expect(redElement?.nodeA).toBe(commonNode); // anode is the shared common leg
+    expect(redElement?.nodeB).not.toBe(commonNode); // cathode is the channel's own lead
+  });
+
+  it("contributes one graph element per segment for a 7-segment display", () => {
+    const bb = breadboard("bb1");
+    const segmentLeads = {
+      a: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 1 },
+      },
+      b: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 2 },
+      },
+      c: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 3 },
+      },
+      d: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 4 },
+      },
+      e: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 5 },
+      },
+      f: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 6 },
+      },
+      g: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 7 },
+      },
+      dp: {
+        kind: "breadboardHole" as const,
+        boardItemId: "bb1",
+        hole: { kind: "strip" as const, row: "a" as const, column: 8 },
+      },
+    };
+    const display: PlacedComponent = {
+      id: "seg1",
+      type: "sevenSegmentDisplay",
+      params: { commonTerminal: "cathode", segment: ledParams },
+      commonLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "rail", rail: "top-negative" },
+      },
+      segmentLeads,
+      health: {
+        a: { status: "nominal" },
+        b: { status: "nominal" },
+        c: { status: "nominal" },
+        d: { status: "nominal" },
+        e: { status: "nominal" },
+        f: { status: "nominal" },
+        g: { status: "nominal" },
+        dp: { status: "nominal" },
+      },
+    };
+    const result = buildCircuit([bb], [display], []);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+    for (const name of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
+      expect(result.graph.getElement(`seg1:${name}`)).toBeDefined();
+    }
+    // 1 supply edge + 8 segments
+    expect(result.graph.allElements).toHaveLength(9);
+  });
+});

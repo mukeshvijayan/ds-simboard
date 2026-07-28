@@ -40,7 +40,9 @@ export type BreadboardComponentType =
   | "soilMoistureSensor"
   | "rainSensor"
   | "soundSensor"
-  | "dht11";
+  | "dht11"
+  | "rgbLed"
+  | "sevenSegmentDisplay";
 
 interface BaseComponent {
   id: string;
@@ -139,6 +141,63 @@ export interface PlacedDht11 extends BaseComponent {
   simulatedHumidityPercent: number;
 }
 
+/**
+ * Multi-lead components (P2-2, closing ADR 0022): each is genuinely N
+ * independent LED branches sharing one common leg — the same
+ * `evaluateLed`/`ledSeriesElement` physics component-library already
+ * has, reused per channel/segment. No new `component-library` model is
+ * needed since this isn't new physics, just more of the same physics
+ * wired to more leads than the old 2-terminal-only placement UI could
+ * express. `health`/visuals are per-channel (a real LED die can burn out
+ * independently of its neighbors sharing the same package).
+ */
+export interface RgbLedParams {
+  commonTerminal: "cathode" | "anode";
+  red: LedParams;
+  green: LedParams;
+  blue: LedParams;
+}
+
+export interface PlacedRgbLed {
+  id: string;
+  type: "rgbLed";
+  params: RgbLedParams;
+  commonLead: ConnectionPointRef;
+  redLead: ConnectionPointRef;
+  greenLead: ConnectionPointRef;
+  blueLead: ConnectionPointRef;
+  health: { red: HealthState; green: HealthState; blue: HealthState };
+}
+
+export type SevenSegmentName = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "dp";
+
+export const SEVEN_SEGMENT_NAMES: SevenSegmentName[] = [
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "dp",
+];
+
+export interface SevenSegmentParams {
+  commonTerminal: "cathode" | "anode";
+  /** Every segment on a real 7-segment display is an identical LED die —
+   * one shared set of electrical params, not one per segment. */
+  segment: LedParams;
+}
+
+export interface PlacedSevenSegmentDisplay {
+  id: string;
+  type: "sevenSegmentDisplay";
+  params: SevenSegmentParams;
+  commonLead: ConnectionPointRef;
+  segmentLeads: Record<SevenSegmentName, ConnectionPointRef>;
+  health: Record<SevenSegmentName, HealthState>;
+}
+
 export type PlacedComponent =
   | PlacedResistor
   | PlacedLed
@@ -153,7 +212,9 @@ export type PlacedComponent =
   | PlacedSoilMoistureSensor
   | PlacedRainSensor
   | PlacedSoundSensor
-  | PlacedDht11;
+  | PlacedDht11
+  | PlacedRgbLed
+  | PlacedSevenSegmentDisplay;
 
 /** A user-drawn wire directly connecting any two connection points. */
 export interface CanvasWireModel {

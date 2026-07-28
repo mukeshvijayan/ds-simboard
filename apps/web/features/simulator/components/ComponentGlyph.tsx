@@ -2,7 +2,8 @@
 
 import type { HoleAddress } from "@ds-simboard/circuit-engine";
 import { holePosition, resolveVisualColumn } from "../model/layout";
-import type { ComponentResult } from "../model/resolveCircuit";
+import { overallHealthStatus, type ComponentResult } from "../model/resolveCircuit";
+import { componentLeadPoints } from "../model/componentElements";
 import type { LedColor } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import type { PlacedComponent } from "../model/types";
@@ -19,23 +20,39 @@ const LED_LIT_COLORS: Record<LedColor, string> = {
 /** This canvas slice only renders components whose leads are breadboard
  * holes (P2-1's scope, per ADR 0024) — bare/freestanding leads get their
  * own glyph rendering once P2-3 needs it. */
-function holeOf(point: ConnectionPointRef): HoleAddress {
-  if (point.kind !== "breadboardHole") {
-    throw new RangeError("expected a breadboard-hole connection point");
-  }
-  return point.hole;
+function holeOf(point: ConnectionPointRef): HoleAddress | null {
+  return point.kind === "breadboardHole" ? point.hole : null;
 }
 
 function glyphColor(
   component: PlacedComponent,
   result: ComponentResult | undefined
 ): string {
-  if (result?.health.status === "failed") return "#8a3b3b";
-  if (result?.health.status === "stressed") return "#b8862f";
+  const status = result ? overallHealthStatus(result.health) : "nominal";
+  if (status === "failed") return "#8a3b3b";
+  if (status === "stressed") return "#b8862f";
 
   if (component.type === "led" && result) {
     const brightness = (result.visual as { brightness?: number }).brightness ?? 0;
     return brightness > 0 ? LED_LIT_COLORS[component.params.color] : "#A7A59D";
+  }
+  if (component.type === "rgbLed" && result) {
+    const visual = result.visual as {
+      red: { visual: { brightness: number } };
+      green: { visual: { brightness: number } };
+      blue: { visual: { brightness: number } };
+    };
+    const r = Math.round(visual.red.visual.brightness * 255);
+    const g = Math.round(visual.green.visual.brightness * 255);
+    const b = Math.round(visual.blue.visual.brightness * 255);
+    return r + g + b > 0 ? `rgb(${r}, ${g}, ${b})` : "#A7A59D";
+  }
+  if (component.type === "sevenSegmentDisplay" && result) {
+    const visual = result.visual as {
+      segments: Record<string, { visual: { brightness: number } }>;
+    };
+    const anyLit = Object.values(visual.segments).some((s) => s.visual.brightness > 0);
+    return anyLit ? "#D64545" : "#A7A59D";
   }
   if (component.type === "buzzer" && result) {
     const isBuzzing = (result.visual as { isBuzzing?: boolean }).isBuzzing ?? false;
@@ -84,16 +101,20 @@ export function ComponentGlyph({
   isSelected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const leadA = holeOf(component.leads[0]);
-  const leadB = holeOf(component.leads[1]);
-  const colA = resolveVisualColumn(leadA, leadB);
-  const colB = resolveVisualColumn(leadB, leadA);
-  const posA = holePosition({ address: leadA, visualColumn: colA }, columns);
-  const posB = holePosition({ address: leadB, visualColumn: colB }, columns);
-  const midX = (posA.xPercent + posB.xPercent) / 2;
-  const midY = (posA.yPercent + posB.yPercent) / 2;
+  const holes = componentLeadPoints(component)
+    .map(holeOf)
+    .filter((hole): hole is HoleAddress => hole !== null);
+  const others = holes.slice(1);
+  const positions = holes.map((hole, index) => {
+    const other = others[index] ?? others[0] ?? hole;
+    const col = resolveVisualColumn(hole, other);
+    return holePosition({ address: hole, visualColumn: col }, columns);
+  });
+  const midX = positions.reduce((sum, p) => sum + p.xPercent, 0) / positions.length;
+  const midY = positions.reduce((sum, p) => sum + p.yPercent, 0) / positions.length;
   const color = glyphColor(component, result);
-  const failed = result?.health.status === "failed";
+  const status = result ? overallHealthStatus(result.health) : "nominal";
+  const failed = status === "failed";
 
   return (
     <button

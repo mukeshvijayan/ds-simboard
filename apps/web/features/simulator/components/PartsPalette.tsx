@@ -1,6 +1,6 @@
 "use client";
 
-import { PART_PRESETS } from "../constants";
+import { PART_PRESETS, presetLeadNames } from "../constants";
 import type { InteractionMode } from "../model/interactionMode";
 
 export function PartsPalette({
@@ -72,12 +72,14 @@ export function PartsPalette({
 
       <p className="border-t border-hairline pt-3 text-[12px] leading-relaxed text-charcoal-muted">
         {mode.kind === "placing" &&
-          (activePreset?.type === "led" || activePreset?.type === "diode") &&
-          "Click the anode (+) hole first, then the cathode (−) hole."}
-        {mode.kind === "placing" &&
-          activePreset?.type !== "led" &&
-          activePreset?.type !== "diode" &&
-          "Click two holes to place it."}
+          activePreset &&
+          (() => {
+            const names = presetLeadNames(activePreset);
+            const next = names[mode.collectedPoints.length];
+            return next
+              ? `Click the ${next} hole (${mode.collectedPoints.length + 1} of ${names.length}).`
+              : "Placing…";
+          })()}
         {mode.kind === "wiring" && "Click two holes to connect them."}
         {mode.kind === "idle" &&
           "Pick a part or draw a wire, then click holes on the board."}

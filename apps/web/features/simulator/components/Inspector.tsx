@@ -1,7 +1,12 @@
 "use client";
 
 import { PART_LABELS } from "../constants";
-import type { ComponentResult } from "../model/resolveCircuit";
+import {
+  firstHealthReason,
+  overallHealthStatus,
+  type ComponentResult,
+} from "../model/resolveCircuit";
+import { SEVEN_SEGMENT_NAMES } from "../model/types";
 import type { PlacedComponent } from "../model/types";
 
 export function Inspector({
@@ -57,12 +62,22 @@ export function Inspector({
       <dl className="flex flex-col gap-1.5 text-[13px] text-charcoal">
         <div className="flex justify-between">
           <dt className="text-charcoal-muted">Health</dt>
-          <dd className={result?.health.status === "failed" ? "text-[#8a3b3b]" : ""}>
-            {result?.health.status ?? component.health.status}
+          <dd
+            className={
+              (result
+                ? overallHealthStatus(result.health)
+                : overallHealthStatus(component.health)) === "failed"
+                ? "text-[#8a3b3b]"
+                : ""
+            }
+          >
+            {result
+              ? overallHealthStatus(result.health)
+              : overallHealthStatus(component.health)}
           </dd>
         </div>
-        {result?.health.reason && (
-          <p className="text-[12px] text-[#8a3b3b]">{result.health.reason}</p>
+        {result && firstHealthReason(result.health) && (
+          <p className="text-[12px] text-[#8a3b3b]">{firstHealthReason(result.health)}</p>
         )}
 
         {component.type === "resistor" && (
@@ -203,6 +218,47 @@ export function Inspector({
               <dd>{component.simulatedHumidityPercent}%</dd>
             </div>
           </>
+        )}
+
+        {component.type === "rgbLed" && result && (
+          <>
+            {(["red", "green", "blue"] as const).map((channel) => (
+              <div key={channel} className="flex justify-between">
+                <dt className="text-charcoal-muted capitalize">{channel}</dt>
+                <dd>
+                  {Math.round(
+                    (
+                      result.visual as {
+                        red: { visual: { brightness: number } };
+                        green: { visual: { brightness: number } };
+                        blue: { visual: { brightness: number } };
+                      }
+                    )[channel].visual.brightness * 100
+                  )}
+                  %
+                </dd>
+              </div>
+            ))}
+          </>
+        )}
+
+        {component.type === "sevenSegmentDisplay" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Segments lit</dt>
+            <dd>
+              {
+                Object.values(
+                  (
+                    result.visual as {
+                      segments: Record<string, { visual: { brightness: number } }>;
+                    }
+                  ).segments
+                ).filter((s) => s.visual.brightness > 0).length
+              }
+              {" / "}
+              {SEVEN_SEGMENT_NAMES.length}
+            </dd>
+          </div>
         )}
       </dl>
 

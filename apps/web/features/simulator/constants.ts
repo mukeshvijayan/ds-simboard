@@ -15,7 +15,11 @@ import type {
   SoilMoistureSensorParams,
   SoundSensorParams,
 } from "@ds-simboard/component-library";
-import type { BreadboardComponentType } from "./model/types";
+import type {
+  BreadboardComponentType,
+  RgbLedParams,
+  SevenSegmentParams,
+} from "./model/types";
 
 /** Kept small deliberately — enough columns for a handful of real
  * components without the grid becoming unwieldy on a phase-4-scoped UI. */
@@ -42,6 +46,8 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   rainSensor: "Rain Sensor",
   soundSensor: "Sound Sensor",
   dht11: "Temperature & Humidity Sensor (DHT11)",
+  rgbLed: "RGB LED",
+  sevenSegmentDisplay: "7-Segment Display",
 };
 
 /**
@@ -71,7 +77,44 @@ export type PartPreset =
     }
   | { id: string; type: "rainSensor"; label: string; params: RainSensorParams }
   | { id: string; type: "soundSensor"; label: string; params: SoundSensorParams }
-  | { id: string; type: "dht11"; label: string; params: Dht11Params };
+  | { id: string; type: "dht11"; label: string; params: Dht11Params }
+  | { id: string; type: "rgbLed"; label: string; params: RgbLedParams }
+  | {
+      id: string;
+      type: "sevenSegmentDisplay";
+      label: string;
+      params: SevenSegmentParams;
+    };
+
+/**
+ * How many leads a preset needs, and what to call each one while placing
+ * it — a plain 2-lead part just needs "first"/"second" (or "anode"/
+ * "cathode" for polarized ones), but a multi-lead part (P2-2, closing
+ * ADR 0022) needs one prompt per physical terminal, in the exact order
+ * `createComponent` expects them.
+ */
+export function presetLeadNames(preset: PartPreset): string[] {
+  if (preset.type === "rgbLed") {
+    return ["common leg", "red lead", "green lead", "blue lead"];
+  }
+  if (preset.type === "sevenSegmentDisplay") {
+    return [
+      "common leg",
+      "segment a",
+      "segment b",
+      "segment c",
+      "segment d",
+      "segment e",
+      "segment f",
+      "segment g",
+      "decimal point",
+    ];
+  }
+  if (preset.type === "led" || preset.type === "diode") {
+    return ["anode (+)", "cathode (−)"];
+  }
+  return ["first lead", "second lead"];
+}
 
 /** Real-world typical forward voltages per spec Part 2.2. */
 const LED_PRESETS: PartPreset[] = [
@@ -256,6 +299,86 @@ export const PART_PRESETS: PartPreset[] = [
     type: "dht11",
     label: "Temperature & Humidity Sensor (DHT11)",
     params: { operatingCurrentAmps: 0.0025 },
+  },
+  {
+    id: "rgb-led-common-cathode",
+    type: "rgbLed",
+    label: "RGB LED (Common Cathode)",
+    params: {
+      commonTerminal: "cathode",
+      red: {
+        forwardVoltageVolts: 2.0,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "red",
+      },
+      green: {
+        forwardVoltageVolts: 2.1,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "green",
+      },
+      blue: {
+        forwardVoltageVolts: 3.2,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "blue",
+      },
+    },
+  },
+  {
+    id: "rgb-led-common-anode",
+    type: "rgbLed",
+    label: "RGB LED (Common Anode)",
+    params: {
+      commonTerminal: "anode",
+      red: {
+        forwardVoltageVolts: 2.0,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "red",
+      },
+      green: {
+        forwardVoltageVolts: 2.1,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "green",
+      },
+      blue: {
+        forwardVoltageVolts: 3.2,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "blue",
+      },
+    },
+  },
+  {
+    id: "seven-segment-common-cathode",
+    type: "sevenSegmentDisplay",
+    label: "7-Segment Display (Common Cathode)",
+    params: {
+      commonTerminal: "cathode",
+      segment: {
+        forwardVoltageVolts: 2.0,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "red",
+      },
+    },
+  },
+  {
+    id: "seven-segment-common-anode",
+    type: "sevenSegmentDisplay",
+    label: "7-Segment Display (Common Anode)",
+    params: {
+      commonTerminal: "anode",
+      segment: {
+        forwardVoltageVolts: 2.0,
+        ratedCurrentAmps: 0.02,
+        maxCurrentAmps: 0.03,
+        color: "red",
+      },
+    },
   },
 ];
 

@@ -1,5 +1,6 @@
 import {
   type MnaDiodeElementDescriptor,
+  type MnaDiodeSolveResult,
   solveMnaFromGraphWithDiodes,
 } from "@ds-simboard/circuit-engine";
 import {
@@ -36,8 +37,10 @@ import {
   type Dht11Visual,
   type DiodeVisual,
   type LdrVisual,
+  type LedParams,
   type LedVisual,
   type HealthState,
+  type HealthStatus,
   type MotionSensorVisual,
   type PotentiometerVisual,
   type PushbuttonVisual,
@@ -47,7 +50,26 @@ import {
   type SoundSensorVisual,
 } from "@ds-simboard/component-library";
 import { buildCircuit, SUPPLY_ELEMENT_PREFIX } from "./buildCircuit";
-import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./types";
+import { componentGraphElements } from "./componentElements";
+import {
+  SEVEN_SEGMENT_NAMES,
+  type CanvasWireModel,
+  type PlacedBreadboard,
+  type PlacedComponent,
+  type PlacedRgbLed,
+  type PlacedSevenSegmentDisplay,
+  type SevenSegmentName,
+} from "./types";
+
+export interface RgbLedVisual {
+  red: { health: HealthState; visual: LedVisual };
+  green: { health: HealthState; visual: LedVisual };
+  blue: { health: HealthState; visual: LedVisual };
+}
+
+export interface SevenSegmentVisual {
+  segments: Record<SevenSegmentName, { health: HealthState; visual: LedVisual }>;
+}
 
 export type ComponentVisual =
   | ResistorVisual
@@ -63,11 +85,74 @@ export type ComponentVisual =
   | SoilMoistureSensorVisual
   | RainSensorVisual
   | SoundSensorVisual
-  | Dht11Visual;
+  | Dht11Visual
+  | RgbLedVisual
+  | SevenSegmentVisual;
+
+/** A multi-lead component's `health` is per-channel (a real LED die can
+ * fail independently of its neighbors sharing one package) — not every
+ * `ComponentResult.health` is a single `HealthState` any more. */
+export type ComponentHealth =
+  | HealthState
+  | { red: HealthState; green: HealthState; blue: HealthState }
+  | Record<SevenSegmentName, HealthState>;
 
 export interface ComponentResult {
-  health: HealthState;
+  health: ComponentHealth;
   visual: ComponentVisual;
+}
+
+/** Whether two `ComponentHealth` values represent the same status(es) —
+ * used to decide whether a component's stored health needs updating.
+ * Structural (duck-typed) rather than component-type-specific, since a
+ * flat `HealthState` and a per-channel record are told apart by whether
+ * `"status"` is present, regardless of how many channels there are. */
+export function componentHealthEquals(a: ComponentHealth, b: ComponentHealth): boolean {
+  if ("status" in a && "status" in b) {
+    return a.status === b.status;
+  }
+  if (!("status" in a) && !("status" in b)) {
+    const aRecord = a as Record<string, HealthState>;
+    const bRecord = b as Record<string, HealthState>;
+    const keys = Object.keys(bRecord);
+    return (
+      keys.length === Object.keys(aRecord).length &&
+      keys.every((key) => aRecord[key]?.status === bRecord[key].status)
+    );
+  }
+  return false;
+}
+
+/** The single worst status across a `ComponentHealth` value — a plain
+ * `HealthState` passes through directly; a multi-channel component
+ * reports "failed" if any channel has, else "stressed" if any has,
+ * else "nominal". Used wherever the UI needs one status to show/compare
+ * (a glyph's color, the persisted-health-changed check) without caring
+ * which specific channel is responsible. */
+export function overallHealthStatus(health: ComponentHealth): HealthStatus {
+  if ("status" in health) {
+    return health.status;
+  }
+  const statuses = Object.values(health as Record<string, HealthState>).map(
+    (h) => h.status
+  );
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.includes("stressed")) return "stressed";
+  return "nominal";
+}
+
+/** The first failure reason found in a `ComponentHealth` value, if any —
+ * a flat `HealthState`'s own reason, or the first failed channel's
+ * reason for a multi-lead part. Used for the Inspector's one-line health
+ * detail, which doesn't need to enumerate every channel's own reason. */
+export function firstHealthReason(health: ComponentHealth): string | undefined {
+  if ("status" in health) {
+    return health.reason;
+  }
+  const failed = Object.values(health as Record<string, HealthState>).find(
+    (h) => h.reason !== undefined
+  );
+  return failed?.reason;
 }
 
 export type ResolveCircuitResult =
@@ -113,6 +198,16 @@ type NonPolarizedComponent = Extract<
   }
 >;
 type PolarizedComponent = Extract<PlacedComponent, { type: "led" | "diode" }>;
+
+/** How a single graph branch resolved, in whatever terms the calling
+ * context has them: the real per-tick solve, a forced short-circuit
+ * (every branch forward at 0A), or a forced non-convergent fallback
+ * (every branch reverse at 0V). */
+interface ElementOutcome {
+  currentAmps: number;
+  isForward: boolean;
+  voltageAcross: number;
+}
 
 /** See the identically-named helper in the retired Breadboard Lab
  * `resolveCircuit.ts` — these component types never report `"fixed-drop"`,
@@ -268,16 +363,60 @@ function evaluatePolarized(
   return { health: result.health, visual: result.visual };
 }
 
-function describeElement(component: PlacedComponent): MnaDiodeElementDescriptor {
+/** One RGB/7-segment channel's LED evaluation — the same "already failed
+ * stays a forced-forward 0Ω short" special case the plain `led` type
+ * gets, per channel. */
+function evaluateLedChannel(
+  params: LedParams,
+  health: HealthState,
+  outcome: ElementOutcome
+): { health: HealthState; visual: LedVisual } {
+  if (health.status === "failed") {
+    const result = evaluateLed(
+      params,
+      { biased: "forward", currentAmps: outcome.currentAmps },
+      { health }
+    );
+    return { health: result.health, visual: result.visual };
+  }
+  const result = outcome.isForward
+    ? evaluateLed(
+        params,
+        { biased: "forward", currentAmps: outcome.currentAmps },
+        { health }
+      )
+    : evaluateLed(params, { biased: "reverse" }, { health });
+  return { health: result.health, visual: result.visual };
+}
+
+function describeLedLikeElement(
+  params: { forwardVoltageVolts: number },
+  health: HealthState
+): MnaDiodeElementDescriptor {
+  if (health.status === "failed") {
+    return { kind: "resistive", resistanceOhms: 0 };
+  }
+  return {
+    kind: "diode",
+    forwardVoltageVolts: params.forwardVoltageVolts,
+    reverseResistanceOhms: Infinity,
+  };
+}
+
+function describeElement(
+  elementId: string,
+  component: PlacedComponent
+): MnaDiodeElementDescriptor {
   if (component.type === "led" || component.type === "diode") {
-    if (component.health.status === "failed") {
-      return { kind: "resistive", resistanceOhms: 0 };
-    }
-    return {
-      kind: "diode",
-      forwardVoltageVolts: component.params.forwardVoltageVolts,
-      reverseResistanceOhms: Infinity,
-    };
+    return describeLedLikeElement(component.params, component.health);
+  }
+  if (component.type === "rgbLed") {
+    const channel = elementId.slice(component.id.length + 1) as "red" | "green" | "blue";
+    return describeLedLikeElement(component.params[channel], component.health[channel]);
+  }
+  if (component.type === "sevenSegmentDisplay") {
+    const segment = elementId.slice(component.id.length + 1) as SevenSegmentName;
+    return describeLedLikeElement(component.params.segment, component.health[segment]);
   }
   switch (component.type) {
     case "resistor":
@@ -359,13 +498,84 @@ function describeElement(component: PlacedComponent): MnaDiodeElementDescriptor 
   }
 }
 
+function evaluateRgbLed(
+  component: PlacedRgbLed,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const red = evaluateLedChannel(
+    component.params.red,
+    component.health.red,
+    getOutcome(`${component.id}:red`)
+  );
+  const green = evaluateLedChannel(
+    component.params.green,
+    component.health.green,
+    getOutcome(`${component.id}:green`)
+  );
+  const blue = evaluateLedChannel(
+    component.params.blue,
+    component.health.blue,
+    getOutcome(`${component.id}:blue`)
+  );
+  return {
+    health: { red: red.health, green: green.health, blue: blue.health },
+    visual: { red, green, blue },
+  };
+}
+
+function evaluateSevenSegment(
+  component: PlacedSevenSegmentDisplay,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const health: Record<string, HealthState> = {};
+  const segments: Record<string, { health: HealthState; visual: LedVisual }> = {};
+  for (const name of SEVEN_SEGMENT_NAMES) {
+    const evaluated = evaluateLedChannel(
+      component.params.segment,
+      component.health[name],
+      getOutcome(`${component.id}:${name}`)
+    );
+    health[name] = evaluated.health;
+    segments[name] = evaluated;
+  }
+  return {
+    health: health as Record<SevenSegmentName, HealthState>,
+    visual: { segments: segments as SevenSegmentVisual["segments"] },
+  };
+}
+
+function evaluateComponent(
+  component: PlacedComponent,
+  getOutcome: (elementId: string) => ElementOutcome,
+  supplyVoltageVolts: number
+): ComponentResult {
+  if (component.type === "rgbLed") {
+    return evaluateRgbLed(component, getOutcome);
+  }
+  if (component.type === "sevenSegmentDisplay") {
+    return evaluateSevenSegment(component, getOutcome);
+  }
+  if (component.type === "led" || component.type === "diode") {
+    const outcome = getOutcome(component.id);
+    if (component.health.status === "failed") {
+      return evaluatePolarized(component, "forward", outcome.currentAmps);
+    }
+    return outcome.isForward
+      ? evaluatePolarized(component, "forward", outcome.currentAmps)
+      : evaluatePolarized(component, "reverse", outcome.voltageAcross);
+  }
+  const outcome = getOutcome(component.id);
+  return evaluateNonPolarized(component, outcome.currentAmps, supplyVoltageVolts);
+}
+
 /**
  * The unified canvas's full per-tick resolve: builds the graph from
  * every placed breadboard/component/wire (via `buildCircuit`, generalized
  * connection points), solves it via the general MNA/diode solver
  * (A-Engine), and derives every component's updated health and visual
  * from the *actual* solved current/voltage — never a scripted stand-in,
- * per spec Part 1.
+ * per spec Part 1. Multi-lead components (P2-2) evaluate each of their
+ * channels the same way, via `componentGraphElements`.
  */
 export function resolveCircuit(
   breadboards: PlacedBreadboard[],
@@ -382,19 +592,24 @@ export function resolveCircuit(
   }
 
   const { graph, groundNodeId } = built;
-  const componentById = new Map(components.map((c) => [c.id, c]));
+  const ownerByElementId = new Map<string, PlacedComponent>();
+  for (const component of components) {
+    for (const element of componentGraphElements(component)) {
+      ownerByElementId.set(element.elementId, component);
+    }
+  }
 
-  let outcome;
+  let outcome: MnaDiodeSolveResult;
   try {
     outcome = solveMnaFromGraphWithDiodes(graph, groundNodeId, (elementId) => {
       if (elementId.startsWith(SUPPLY_ELEMENT_PREFIX)) {
         return { kind: "voltage-source", voltageVolts: supplyVoltageVolts };
       }
-      const component = componentById.get(elementId);
+      const component = ownerByElementId.get(elementId);
       if (!component) {
-        throw new RangeError(`no placed component with id "${elementId}"`);
+        throw new RangeError(`no placed component owns graph element "${elementId}"`);
       }
-      return describeElement(component);
+      return describeElement(elementId, component);
     });
   } catch (err) {
     // A second, ground-disconnected breadboard with its own supply edge
@@ -411,25 +626,32 @@ export function resolveCircuit(
   const componentResults = new Map<string, ComponentResult>();
 
   if (outcome.kind === "short-circuit") {
+    const forcedForward: ElementOutcome = {
+      currentAmps: 0,
+      isForward: true,
+      voltageAcross: 0,
+    };
     for (const component of components) {
-      const health = applyShortCircuitHealth(component.health);
-      const failedComponent = { ...component, health };
-      const result =
-        failedComponent.type === "led" || failedComponent.type === "diode"
-          ? evaluatePolarized(failedComponent, "forward", 0)
-          : evaluateNonPolarized(failedComponent, 0, supplyVoltageVolts);
-      componentResults.set(component.id, result);
+      const failedComponent = withShortCircuitHealth(component);
+      componentResults.set(
+        component.id,
+        evaluateComponent(failedComponent, () => forcedForward, supplyVoltageVolts)
+      );
     }
     return { status: "short-circuit", componentResults };
   }
 
   if (outcome.kind === "non-convergent") {
+    const forcedReverse: ElementOutcome = {
+      currentAmps: 0,
+      isForward: false,
+      voltageAcross: 0,
+    };
     for (const component of components) {
-      const result =
-        component.type === "led" || component.type === "diode"
-          ? evaluatePolarized(component, "reverse", 0)
-          : evaluateNonPolarized(component, 0, supplyVoltageVolts);
-      componentResults.set(component.id, result);
+      componentResults.set(
+        component.id,
+        evaluateComponent(component, () => forcedReverse, supplyVoltageVolts)
+      );
     }
     return {
       status: "unresolved",
@@ -439,49 +661,43 @@ export function resolveCircuit(
     };
   }
 
-  for (const component of components) {
-    if (component.type === "led" || component.type === "diode") {
-      if (component.health.status === "failed") {
-        const current = outcome.elementCurrentsAmps.get(component.id) ?? 0;
-        componentResults.set(
-          component.id,
-          evaluatePolarized(component, "forward", current)
-        );
-        continue;
-      }
-      const diodeState = outcome.diodeStates.get(component.id);
-      const bias: "forward" | "reverse" =
-        diodeState === "conducting" ? "forward" : "reverse";
-      if (bias === "forward") {
-        const current = outcome.elementCurrentsAmps.get(component.id) as number;
-        componentResults.set(
-          component.id,
-          evaluatePolarized(component, "forward", current)
-        );
-      } else {
-        const element = graph.getElement(component.id);
-        const voltageAcross =
-          element === undefined
-            ? 0
-            : (outcome.nodeVoltages.get(element.nodeA) ?? 0) -
-              (outcome.nodeVoltages.get(element.nodeB) ?? 0);
-        componentResults.set(
-          component.id,
-          evaluatePolarized(component, "reverse", voltageAcross)
-        );
-      }
-    } else {
-      const current = outcome.elementCurrentsAmps.get(component.id) as number;
-      componentResults.set(
-        component.id,
-        evaluateNonPolarized(component, current, supplyVoltageVolts)
-      );
+  const solved = outcome;
+  const getOutcomeFor = (elementId: string): ElementOutcome => {
+    const diodeState = solved.diodeStates.get(elementId);
+    if (diodeState === undefined) {
+      // A plain resistive element (not a diode-like branch at all).
+      return {
+        currentAmps: solved.elementCurrentsAmps.get(elementId) ?? 0,
+        isForward: true,
+        voltageAcross: 0,
+      };
     }
+    if (diodeState === "conducting") {
+      return {
+        currentAmps: solved.elementCurrentsAmps.get(elementId) as number,
+        isForward: true,
+        voltageAcross: 0,
+      };
+    }
+    const element = graph.getElement(elementId);
+    const voltageAcross =
+      element === undefined
+        ? 0
+        : (solved.nodeVoltages.get(element.nodeA) ?? 0) -
+          (solved.nodeVoltages.get(element.nodeB) ?? 0);
+    return { currentAmps: 0, isForward: false, voltageAcross };
+  };
+
+  for (const component of components) {
+    componentResults.set(
+      component.id,
+      evaluateComponent(component, getOutcomeFor, supplyVoltageVolts)
+    );
   }
 
   let supplyCurrentAmps = 0;
   for (const breadboard of breadboards) {
-    const supplyCurrent = outcome.elementCurrentsAmps.get(
+    const supplyCurrent = solved.elementCurrentsAmps.get(
       `${SUPPLY_ELEMENT_PREFIX}${breadboard.id}`
     );
     if (supplyCurrent !== undefined) {
@@ -492,4 +708,32 @@ export function resolveCircuit(
   }
 
   return { status: "solved", supplyCurrentAmps, componentResults };
+}
+
+/** Applies `applyShortCircuitHealth` to every element a component owns —
+ * once for a plain component, once per channel (against that channel's
+ * own previous health) for a multi-lead part, since a real LED die
+ * latches its own failure independently of its neighbors. */
+function withShortCircuitHealth(component: PlacedComponent): PlacedComponent {
+  if (component.type === "rgbLed") {
+    return {
+      ...component,
+      health: {
+        red: applyShortCircuitHealth(component.health.red),
+        green: applyShortCircuitHealth(component.health.green),
+        blue: applyShortCircuitHealth(component.health.blue),
+      },
+    };
+  }
+  if (component.type === "sevenSegmentDisplay") {
+    const health = {} as Record<SevenSegmentName, HealthState>;
+    for (const name of SEVEN_SEGMENT_NAMES) {
+      health[name] = applyShortCircuitHealth(component.health[name]);
+    }
+    return { ...component, health };
+  }
+  return {
+    ...component,
+    health: applyShortCircuitHealth(component.health),
+  } as PlacedComponent;
 }

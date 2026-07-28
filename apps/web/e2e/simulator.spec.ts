@@ -68,11 +68,14 @@ test.describe("Simulator", () => {
     // this pans the whole canvas rather than dragging the board itself.
     // Content follows the cursor (the standard "grab and drag" pan
     // convention): dragging left+down moves the breadboard left+down too.
+    // A single move (no intermediate `steps`) — the pan math is computed
+    // fresh from the drag-start snapshot each event, not accumulated, so
+    // stepping adds no test value and only adds a race under parallel
+    // load (mouse.up reaching the page before the last of several
+    // stepped mousemove events does).
     await page.mouse.move(canvasBox.x + canvasBox.width - 20, canvasBox.y + 20);
     await page.mouse.down();
-    await page.mouse.move(canvasBox.x + canvasBox.width - 120, canvasBox.y + 120, {
-      steps: 5,
-    });
+    await page.mouse.move(canvasBox.x + canvasBox.width - 120, canvasBox.y + 120);
     await page.mouse.up();
 
     const after = await breadboard.boundingBox();
@@ -80,6 +83,40 @@ test.describe("Simulator", () => {
     if (!before || !after) return;
     expect(after.x).toBeCloseTo(before.x - 100, -1);
     expect(after.y).toBeCloseTo(before.y + 100, -1);
+  });
+
+  test("placing a multi-lead RGB LED (4 clicks) lights its wired channel", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const hole = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).first();
+
+    // RGB LED needs 4 clicks in order: common leg, red, green, blue —
+    // the multi-lead placement flow this test proves (P2-2, closing ADR
+    // 0022), generalized from the old fixed-2-click flow.
+    await page
+      .getByRole("button", { name: "RGB LED (Common Cathode)", exact: true })
+      .click();
+    await expect(page.getByText(/common leg hole \(1 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, top-negative rail").click();
+    await expect(page.getByText(/red lead hole \(2 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, row a, column 3").click();
+    await expect(page.getByText(/green lead hole \(3 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, row a, column 5").click(); // left unwired — stays dark
+    await hole("Breadboard hole, row a, column 7").click(); // blue, also left unwired
+
+    // Resistor protecting the red channel: positive rail -> row b, column
+    // 3 (same strip column as the RGB LED's red lead).
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await hole("Breadboard hole, top-positive rail").click();
+    await hole("Breadboard hole, row b, column 3").click();
+
+    await expect(page.getByRole("status")).toHaveText(/Circuit is live/);
+    await expect(page.getByRole("button", { name: /^RGB LED rgbLed-/ })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^RGB LED rgbLed-.*, failed/ })
+    ).not.toBeVisible();
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {

@@ -1,6 +1,7 @@
 import { Breadboard, CircuitGraph } from "@ds-simboard/circuit-engine";
 import { connectionPointId, type ConnectionPointRef } from "./connectionPoint";
 import { resolveConnectivity } from "./connectivity";
+import { componentGraphElements } from "./componentElements";
 import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./types";
 
 export const SUPPLY_ELEMENT_PREFIX = "__supply__:";
@@ -20,11 +21,13 @@ export type BuildCircuitResult =
 /**
  * Builds the `CircuitGraph` for the whole canvas: one synthetic supply
  * edge per placed breadboard (across its own rails, all sharing the same
- * board-wide `supplyVoltageVolts`), plus one element per placed
- * component, with every node id resolved through `resolveConnectivity` —
- * so components can freely span multiple breadboards, bare canvas leads,
- * or (P2-3) board pins, not just one fixed board's holes. See
- * docs/architecture/0024-*.md.
+ * board-wide `supplyVoltageVolts`), plus every graph branch each placed
+ * component contributes (`componentGraphElements` — one for a plain
+ * 2-lead part, several sharing a common leg for a multi-lead part like
+ * an RGB LED, P2-2), with every node id resolved through
+ * `resolveConnectivity` — so components can freely span multiple
+ * breadboards, bare canvas leads, or (P2-3) board pins, not just one
+ * fixed board's holes. See docs/architecture/0024-*.md.
  *
  * At least one placed breadboard is required to establish a ground
  * reference (its negative rail) — components with nothing to power them
@@ -55,7 +58,9 @@ export function buildCircuit(
     allPoints.push(railPoint(bb.id, "top-positive"), railPoint(bb.id, "top-negative"));
   }
   for (const component of components) {
-    allPoints.push(component.leads[0], component.leads[1]);
+    for (const element of componentGraphElements(component)) {
+      allPoints.push(element.nodeA, element.nodeB);
+    }
   }
   for (const wire of wires) {
     allPoints.push(wire.from, wire.to);
@@ -97,17 +102,13 @@ export function buildCircuit(
   }
 
   for (const component of components) {
-    const swapLeads =
-      (component.type === "led" || component.type === "diode") &&
-      !component.leadZeroIsPositive;
-    const [anodeLead, cathodeLead] = swapLeads
-      ? [component.leads[1], component.leads[0]]
-      : [component.leads[0], component.leads[1]];
-    graph.addElement({
-      id: component.id,
-      nodeA: resolve(connectionPointId(anodeLead)),
-      nodeB: resolve(connectionPointId(cathodeLead)),
-    });
+    for (const element of componentGraphElements(component)) {
+      graph.addElement({
+        id: element.elementId,
+        nodeA: resolve(connectionPointId(element.nodeA)),
+        nodeB: resolve(connectionPointId(element.nodeB)),
+      });
+    }
   }
 
   return { status: "built", graph, groundNodeId };

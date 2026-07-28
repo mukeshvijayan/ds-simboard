@@ -4,6 +4,7 @@ import { useRef } from "react";
 import type { HoleAddress, StripRow } from "@ds-simboard/circuit-engine";
 import { holePosition, resolveVisualColumn, type UIHoleRef } from "../model/layout";
 import type { ComponentResult } from "../model/resolveCircuit";
+import { componentGraphElements } from "../model/componentElements";
 import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "../model/types";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import { Hole } from "./Hole";
@@ -48,7 +49,7 @@ export function BreadboardGlyph({
   components,
   wires,
   componentResults,
-  pendingPoint,
+  pendingPoints,
   selectedComponentId,
   viewportScale,
   onHoleClick,
@@ -59,7 +60,7 @@ export function BreadboardGlyph({
   components: PlacedComponent[];
   wires: CanvasWireModel[];
   componentResults: Map<string, ComponentResult>;
-  pendingPoint: ConnectionPointRef | null;
+  pendingPoints: ConnectionPointRef[];
   selectedComponentId: string | null;
   viewportScale: number;
   onHoleClick: (point: ConnectionPointRef) => void;
@@ -74,9 +75,11 @@ export function BreadboardGlyph({
     position: { x: number; y: number };
   } | null>(null);
 
-  const pendingHoleAddress = pendingPoint ? holeOf(pendingPoint) : null;
+  const pendingHoleAddresses = pendingPoints
+    .map(holeOf)
+    .filter((h): h is HoleAddress => h !== null);
   const isPending = (hole: HoleAddress) =>
-    pendingHoleAddress !== null && sameAddress(pendingHoleAddress, hole);
+    pendingHoleAddresses.some((pending) => sameAddress(pending, hole));
 
   function toConnectionPoint(uiHole: UIHoleRef): ConnectionPointRef {
     return { kind: "breadboardHole", boardItemId: breadboard.id, hole: uiHole.address };
@@ -154,23 +157,25 @@ export function BreadboardGlyph({
             />
           );
         })}
-        {components.map((component) => {
-          const from = holeOf(component.leads[0]);
-          const to = holeOf(component.leads[1]);
-          if (!from || !to) return null;
-          const { x1, y1, x2, y2 } = lineFor(from, to);
-          return (
-            <line
-              key={component.id}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="rgba(28,27,24,0.35)"
-              strokeWidth={0.3}
-            />
-          );
-        })}
+        {components.flatMap((component) =>
+          componentGraphElements(component).map((element) => {
+            const from = holeOf(element.nodeA);
+            const to = holeOf(element.nodeB);
+            if (!from || !to) return null;
+            const { x1, y1, x2, y2 } = lineFor(from, to);
+            return (
+              <line
+                key={element.elementId}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="rgba(28,27,24,0.35)"
+                strokeWidth={0.3}
+              />
+            );
+          })
+        )}
       </svg>
 
       {columnRange.map((c) => (

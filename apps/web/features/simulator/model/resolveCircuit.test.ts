@@ -1,4 +1,4 @@
-import { resolveCircuit } from "./resolveCircuit";
+import { overallHealthStatus, resolveCircuit } from "./resolveCircuit";
 import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./types";
 import type { ConnectionPointRef } from "./connectionPoint";
 
@@ -83,7 +83,9 @@ describe("resolveCircuit — the golden path (LED + resistor + a placed breadboa
     ];
     const result = resolveCircuit([breadboard()], components, [], 5);
     expect(result.status).toBe("short-circuit");
-    expect(result.componentResults.get("led1")?.health.status).toBe("failed");
+    expect(overallHealthStatus(result.componentResults.get("led1")!.health)).toBe(
+      "failed"
+    );
   });
 
   it("stays dark, unharmed, when wired backwards", () => {
@@ -95,7 +97,9 @@ describe("resolveCircuit — the golden path (LED + resistor + a placed breadboa
     expect(result.status).toBe("solved");
     if (result.status !== "solved") return;
     expect(result.supplyCurrentAmps).toBeCloseTo(0);
-    expect(result.componentResults.get("led1")?.health.status).toBe("nominal");
+    expect(overallHealthStatus(result.componentResults.get("led1")!.health)).toBe(
+      "nominal"
+    );
   });
 });
 
@@ -170,8 +174,154 @@ describe("resolveCircuit — short-circuit marks every placed component failed",
     ];
     const result = resolveCircuit([breadboard()], components, [], 5);
     expect(result.status).toBe("short-circuit");
-    expect(result.componentResults.get("led1")?.health.status).toBe("failed");
-    expect(result.componentResults.get("pot1")?.health.status).toBe("failed");
+    expect(overallHealthStatus(result.componentResults.get("led1")!.health)).toBe(
+      "failed"
+    );
+    expect(overallHealthStatus(result.componentResults.get("pot1")!.health)).toBe(
+      "failed"
+    );
+  });
+});
+
+describe("resolveCircuit — RGB LED (P2-2, closing ADR 0022)", () => {
+  const channelParams = (
+    forwardVoltageVolts: number,
+    color: "red" | "green" | "blue"
+  ) => ({
+    forwardVoltageVolts,
+    ratedCurrentAmps: 0.02,
+    maxCurrentAmps: 0.03,
+    color,
+  });
+
+  it("lights each channel independently through its own resistor", () => {
+    const components: PlacedComponent[] = [
+      resistor("rR", [positiveRail(), strip("a", 1)]),
+      resistor("rG", [positiveRail(), strip("a", 2)]),
+      resistor("rB", [positiveRail(), strip("a", 3)]),
+      {
+        id: "rgb1",
+        type: "rgbLed",
+        params: {
+          commonTerminal: "cathode",
+          red: channelParams(2.0, "red"),
+          green: channelParams(2.1, "green"),
+          blue: channelParams(3.2, "blue"),
+        },
+        commonLead: negativeRail(),
+        redLead: strip("a", 1),
+        greenLead: strip("a", 2),
+        blueLead: strip("a", 3),
+        health: {
+          red: { status: "nominal" },
+          green: { status: "nominal" },
+          blue: { status: "nominal" },
+        },
+      },
+    ];
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const rgb = result.componentResults.get("rgb1");
+    const visual = rgb?.visual as {
+      red: { visual: { brightness: number } };
+      green: { visual: { brightness: number } };
+      blue: { visual: { brightness: number } };
+    };
+    expect(visual.red.visual.brightness).toBeGreaterThan(0);
+    expect(visual.green.visual.brightness).toBeGreaterThan(0);
+    expect(visual.blue.visual.brightness).toBeGreaterThan(0);
+  });
+
+  it("fails only the shorted channel, leaving the others nominal", () => {
+    const components: PlacedComponent[] = [
+      resistor("rG", [positiveRail(), strip("a", 2)]),
+      {
+        id: "rgb1",
+        type: "rgbLed",
+        params: {
+          commonTerminal: "cathode",
+          red: channelParams(2.0, "red"),
+          green: channelParams(2.1, "green"),
+          blue: channelParams(3.2, "blue"),
+        },
+        commonLead: negativeRail(),
+        // Red wired directly across the rails — no resistor, a short.
+        redLead: positiveRail(),
+        greenLead: strip("a", 2),
+        blueLead: positiveRail(),
+        health: {
+          red: { status: "nominal" },
+          green: { status: "nominal" },
+          blue: { status: "nominal" },
+        },
+      },
+    ];
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("short-circuit");
+
+    const rgb = result.componentResults.get("rgb1");
+    const health = rgb?.health as {
+      red: { status: string };
+      green: { status: string };
+      blue: { status: string };
+    };
+    expect(health.red.status).toBe("failed");
+    expect(health.green.status).toBe("failed");
+    expect(health.blue.status).toBe("failed");
+  });
+});
+
+describe("resolveCircuit — 7-segment display (P2-2, closing ADR 0022)", () => {
+  it("lights only the wired-and-resistor-protected segments", () => {
+    const segmentParams = {
+      forwardVoltageVolts: 2,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "red" as const,
+    };
+    const components: PlacedComponent[] = [
+      resistor("rA", [positiveRail(), strip("a", 1)]),
+      resistor("rB", [positiveRail(), strip("a", 2)]),
+      {
+        id: "seg1",
+        type: "sevenSegmentDisplay",
+        params: { commonTerminal: "cathode", segment: segmentParams },
+        commonLead: negativeRail(),
+        segmentLeads: {
+          a: strip("a", 1),
+          b: strip("a", 2),
+          c: strip("a", 3), // unwired dead-end elsewhere — stays dark
+          d: strip("a", 3),
+          e: strip("a", 3),
+          f: strip("a", 3),
+          g: strip("a", 3),
+          dp: strip("a", 3),
+        },
+        health: {
+          a: { status: "nominal" },
+          b: { status: "nominal" },
+          c: { status: "nominal" },
+          d: { status: "nominal" },
+          e: { status: "nominal" },
+          f: { status: "nominal" },
+          g: { status: "nominal" },
+          dp: { status: "nominal" },
+        },
+      },
+    ];
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const seg = result.componentResults.get("seg1");
+    const visual = seg?.visual as {
+      segments: Record<string, { visual: { brightness: number } }>;
+    };
+    expect(visual.segments.a.visual.brightness).toBeGreaterThan(0);
+    expect(visual.segments.b.visual.brightness).toBeGreaterThan(0);
+    expect(visual.segments.c.visual.brightness).toBe(0);
   });
 });
 
