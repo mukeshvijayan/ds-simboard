@@ -2,17 +2,19 @@ import { test, expect } from "./fixtures";
 import AxeBuilder from "@axe-core/playwright";
 
 /**
- * The spec's own golden-path example (Part 5.4): a resistor-protected LED
- * lights up at a safe current; an undersized resistor (modeled here by
- * cranking the supply voltage against the same 220Ω resistor) pushes
- * current past the LED's rated max and it burns out — genuinely computed
- * by circuit-engine's solver, not scripted.
+ * The unified canvas (docs/architecture/0024-*.md) collapsing Breadboard
+ * Lab, Arduino Lab, and ESP32 Lab into one route. The spec's own
+ * golden-path example (Part 5.4): a resistor-protected LED lights up at a
+ * safe current; an undersized resistor (modeled here by cranking the
+ * supply voltage against the same 220Ω resistor) pushes current past the
+ * LED's rated max and it burns out — genuinely computed by the general
+ * MNA solver, not scripted.
  */
-test.describe("Breadboard Lab", () => {
+test.describe("Simulator", () => {
   test("a resistor-protected LED lights up; an undersized resistor for a higher supply voltage burns it out", async ({
     page,
   }) => {
-    await page.goto("/breadboard-lab");
+    await page.goto("/simulator");
 
     // Rail holes all share the same aria-label (they're electrically one
     // node, so any hole along the rail works) — `.first()` picks one.
@@ -49,8 +51,39 @@ test.describe("Breadboard Lab", () => {
     await expect(page.getByRole("button", { name: /^LED led-.*, failed/ })).toBeVisible();
   });
 
+  test("panning the canvas background moves the breadboard on screen", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const breadboard = page.getByRole("group", { name: "Breadboard — drag to move" });
+    const before = await breadboard.boundingBox();
+    expect(before).not.toBeNull();
+
+    const canvas = page.getByRole("group", { name: /drag the background to pan/i });
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).not.toBeNull();
+    if (!canvasBox) return;
+
+    // Drag from a point clearly outside the breadboard's own bounds so
+    // this pans the whole canvas rather than dragging the board itself.
+    // Content follows the cursor (the standard "grab and drag" pan
+    // convention): dragging left+down moves the breadboard left+down too.
+    await page.mouse.move(canvasBox.x + canvasBox.width - 20, canvasBox.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + canvasBox.width - 120, canvasBox.y + 120, {
+      steps: 5,
+    });
+    await page.mouse.up();
+
+    const after = await breadboard.boundingBox();
+    expect(after).not.toBeNull();
+    if (!before || !after) return;
+    expect(after.x).toBeCloseTo(before.x - 100, -1);
+    expect(after.y).toBeCloseTo(before.y + 100, -1);
+  });
+
   test("has no automatically detectable accessibility violations", async ({ page }) => {
-    await page.goto("/breadboard-lab");
+    await page.goto("/simulator");
     const results = await new AxeBuilder({ page }).analyze();
     expect(results.violations).toEqual([]);
   });

@@ -1,8 +1,10 @@
 "use client";
 
+import type { HoleAddress } from "@ds-simboard/circuit-engine";
 import { holePosition, resolveVisualColumn } from "../model/layout";
 import type { ComponentResult } from "../model/resolveCircuit";
 import type { LedColor } from "@ds-simboard/component-library";
+import type { ConnectionPointRef } from "../model/connectionPoint";
 import type { PlacedComponent } from "../model/types";
 import { PART_LABELS } from "../constants";
 
@@ -13,6 +15,16 @@ const LED_LIT_COLORS: Record<LedColor, string> = {
   yellow: "#F4C542",
   white: "#F4F1E8",
 };
+
+/** This canvas slice only renders components whose leads are breadboard
+ * holes (P2-1's scope, per ADR 0024) — bare/freestanding leads get their
+ * own glyph rendering once P2-3 needs it. */
+function holeOf(point: ConnectionPointRef): HoleAddress {
+  if (point.kind !== "breadboardHole") {
+    throw new RangeError("expected a breadboard-hole connection point");
+  }
+  return point.hole;
+}
 
 function glyphColor(
   component: PlacedComponent,
@@ -35,7 +47,6 @@ function glyphColor(
     return speedFraction > 0 ? "#3FA6A6" : "#2E7373";
   }
   if (component.type === "ldr") {
-    // Brighter simulated light -> a lighter, more yellow glyph.
     const lightLevel = component.lightLevel;
     return lightLevel > 0.5 ? "#C9A63B" : "#6B6350";
   }
@@ -73,7 +84,8 @@ export function ComponentGlyph({
   isSelected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const [leadA, leadB] = component.leads;
+  const leadA = holeOf(component.leads[0]);
+  const leadB = holeOf(component.leads[1]);
   const colA = resolveVisualColumn(leadA, leadB);
   const colB = resolveVisualColumn(leadB, leadA);
   const posA = holePosition({ address: leadA, visualColumn: colA }, columns);

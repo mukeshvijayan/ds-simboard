@@ -10,8 +10,12 @@ const CONDUCTING_EPSILON_AMPS = 1e-9;
 const COPY: Record<ResolveCircuitResult["status"], { label: string; className: string }> =
   {
     empty: {
-      label: "Nothing wired yet",
+      label: "Nothing placed yet",
       className: "bg-charcoal-faint/20 text-charcoal",
+    },
+    "no-power": {
+      label: "No power source on the canvas",
+      className: "bg-[#b8862f]/10 text-[#b8862f]",
     },
     solved: { label: "Circuit is live", className: "bg-navy/10 text-navy" },
     "short-circuit": {
@@ -32,7 +36,7 @@ export function StatusBanner({ result }: { result: ResolveCircuitResult }) {
     ? { label: "No current is flowing", className: "bg-charcoal-faint/20 text-charcoal" }
     : COPY[result.status];
   const detail =
-    result.status === "unresolved"
+    result.status === "unresolved" || result.status === "no-power"
       ? result.message
       : result.status === "solved" && !isIdle
         ? `${(result.supplyCurrentAmps * 1000).toFixed(1)}mA flowing`

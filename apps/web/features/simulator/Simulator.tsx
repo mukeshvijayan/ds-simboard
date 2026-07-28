@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { HoleAddress } from "@ds-simboard/circuit-engine";
 import {
   BREADBOARD_COLUMNS,
   DEFAULT_SUPPLY_VOLTAGE,
@@ -9,20 +8,30 @@ import {
   PART_PRESETS,
 } from "./constants";
 import { DesktopOnlyNotice } from "@/components/shared/DesktopOnlyNotice";
-import { BreadboardGrid } from "./components/BreadboardGrid";
+import { CanvasSurface } from "./components/CanvasSurface";
+import { BreadboardGlyph } from "./components/BreadboardGlyph";
 import { PartsPalette } from "./components/PartsPalette";
 import { Inspector } from "./components/Inspector";
 import { StatusBanner } from "./components/StatusBanner";
 import type { InteractionMode } from "./model/interactionMode";
+import type { ConnectionPointRef } from "./model/connectionPoint";
 import { resolveCircuit } from "./model/resolveCircuit";
-import type { PlacedComponent, Wire } from "./model/types";
-import type { UIHoleRef } from "./model/layout";
+import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./model/types";
+import { INITIAL_VIEWPORT, type CanvasViewport } from "./model/viewport";
 
 let nextId = 1;
 
+const DEFAULT_BREADBOARD: PlacedBreadboard = {
+  id: "bb-1",
+  position: { x: 60, y: 60 },
+  columns: BREADBOARD_COLUMNS,
+  pixelWidth: 720,
+  pixelHeight: 360,
+};
+
 function createComponent(
   presetId: string,
-  leads: [HoleAddress, HoleAddress]
+  leads: [ConnectionPointRef, ConnectionPointRef]
 ): PlacedComponent {
   const preset = PART_PRESETS.find((p) => p.id === presetId);
   if (!preset) {
@@ -133,24 +142,25 @@ function createComponent(
   }
 }
 
-export function BreadboardLab() {
+export function Simulator() {
+  const [breadboards, setBreadboards] = useState<PlacedBreadboard[]>([
+    DEFAULT_BREADBOARD,
+  ]);
   const [components, setComponents] = useState<PlacedComponent[]>([]);
-  const [wires, setWires] = useState<Wire[]>([]);
+  const [wires, setWires] = useState<CanvasWireModel[]>([]);
   const [supplyVoltage, setSupplyVoltage] = useState(DEFAULT_SUPPLY_VOLTAGE);
   const [mode, setMode] = useState<InteractionMode>({ kind: "idle" });
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [viewport, setViewport] = useState<CanvasViewport>(INITIAL_VIEWPORT);
 
   const result = useMemo(
-    () => resolveCircuit(BREADBOARD_COLUMNS, components, wires, supplyVoltage),
-    [components, wires, supplyVoltage]
+    () => resolveCircuit(breadboards, components, wires, supplyVoltage),
+    [breadboards, components, wires, supplyVoltage]
   );
 
-  // Health latches inside resolveCircuit's per-tick output, but that output
-  // is derived fresh each render — persist any newly-changed health back
-  // into component state so it survives the *next* resolve (matching the
-  // "failed stays failed until replaced" contract from component-library).
-  // Returning the same `prev` array reference when nothing changed makes
-  // this converge after one extra render instead of looping.
+  // Health latches inside resolveCircuit's per-tick output — persist any
+  // newly-changed health back into component state so it survives the
+  // *next* resolve, same "failed stays failed" contract as Breadboard Lab.
   useEffect(() => {
     setComponents((prev) => {
       let changed = false;
@@ -166,31 +176,38 @@ export function BreadboardLab() {
     });
   }, [result]);
 
-  function handleHoleClick(hole: UIHoleRef) {
+  function handlePointClick(point: ConnectionPointRef) {
     if (mode.kind === "idle") return;
 
     if (mode.kind === "placing") {
-      if (!mode.firstHole) {
-        setMode({ ...mode, firstHole: hole.address });
+      if (!mode.firstPoint) {
+        setMode({ ...mode, firstPoint: point });
         return;
       }
       setComponents((prev) => [
         ...prev,
-        createComponent(mode.presetId, [mode.firstHole as HoleAddress, hole.address]),
+        createComponent(mode.presetId, [mode.firstPoint as ConnectionPointRef, point]),
       ]);
       setMode({ kind: "idle" });
       return;
     }
 
-    if (!mode.firstHole) {
-      setMode({ ...mode, firstHole: hole.address });
+    if (!mode.firstPoint) {
+      setMode({ ...mode, firstPoint: point });
       return;
     }
     setWires((prev) => [
       ...prev,
-      { id: `wire-${nextId++}`, from: mode.firstHole as HoleAddress, to: hole.address },
+      { id: `wire-${nextId++}`, from: mode.firstPoint as ConnectionPointRef, to: point },
     ]);
     setMode({ kind: "idle" });
+  }
+
+  function handleBreadboardPositionChange(
+    id: string,
+    position: { x: number; y: number }
+  ) {
+    setBreadboards((prev) => prev.map((bb) => (bb.id === id ? { ...bb, position } : bb)));
   }
 
   function handleRemove(id: string) {
@@ -273,19 +290,16 @@ export function BreadboardLab() {
     setSelectedComponentId(null);
   }
 
-  const pendingHole: UIHoleRef | null =
-    (mode.kind === "placing" || mode.kind === "wiring") && mode.firstHole
-      ? {
-          address: mode.firstHole,
-          visualColumn: mode.firstHole.kind === "strip" ? mode.firstHole.column : 1,
-        }
+  const pendingPoint =
+    (mode.kind === "placing" || mode.kind === "wiring") && mode.firstPoint
+      ? mode.firstPoint
       : null;
 
   const selectedComponent = components.find((c) => c.id === selectedComponentId) ?? null;
 
   return (
     <>
-      <DesktopOnlyNotice labName="Breadboard Lab" />
+      <DesktopOnlyNotice labName="Simulator" />
       <div className="hidden h-full flex-col lg:flex">
         <div className="flex items-center justify-between gap-4 border-b border-hairline bg-ivory px-4 py-3">
           <StatusBanner result={result} />
@@ -321,17 +335,28 @@ export function BreadboardLab() {
             onCancel={() => setMode({ kind: "idle" })}
           />
 
-          <div className="flex-1 overflow-auto p-6">
-            <BreadboardGrid
-              columns={BREADBOARD_COLUMNS}
-              components={components}
-              wires={wires}
-              componentResults={result.componentResults}
-              pendingHole={pendingHole}
-              selectedComponentId={selectedComponentId}
-              onHoleClick={handleHoleClick}
-              onComponentClick={setSelectedComponentId}
-            />
+          <div className="flex-1">
+            <CanvasSurface
+              viewport={viewport}
+              onViewportChange={setViewport}
+              onBackgroundClick={() => setSelectedComponentId(null)}
+            >
+              {breadboards.map((bb) => (
+                <BreadboardGlyph
+                  key={bb.id}
+                  breadboard={bb}
+                  components={components}
+                  wires={wires}
+                  componentResults={result.componentResults}
+                  pendingPoint={pendingPoint}
+                  selectedComponentId={selectedComponentId}
+                  viewportScale={viewport.scale}
+                  onHoleClick={handlePointClick}
+                  onComponentClick={setSelectedComponentId}
+                  onPositionChange={handleBreadboardPositionChange}
+                />
+              ))}
+            </CanvasSurface>
           </div>
 
           <Inspector

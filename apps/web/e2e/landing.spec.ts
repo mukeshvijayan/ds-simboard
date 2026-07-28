@@ -2,22 +2,19 @@ import { test, expect } from "./fixtures";
 import AxeBuilder from "@axe-core/playwright";
 
 test.describe("landing page", () => {
-  test("loads with the right title and links to every lab", async ({ page }) => {
+  test("loads with the right title and links to Docs and the simulator", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/DS SimBoard/);
 
-    await expect(page.getByRole("link", { name: "Breadboard Lab" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "Docs" })).toHaveAttribute(
       "href",
-      "/breadboard-lab"
+      "/docs"
     );
-    await expect(page.getByRole("link", { name: "Arduino Lab" })).toHaveAttribute(
-      "href",
-      "/arduino-lab"
-    );
-    await expect(page.getByRole("link", { name: "ESP32 Lab" })).toHaveAttribute(
-      "href",
-      "/esp32-lab"
-    );
+    await expect(
+      page.getByRole("link", { name: "Open simulator" }).first()
+    ).toHaveAttribute("href", "/simulator");
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {
@@ -30,6 +27,6 @@ test.describe("landing page", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await page.getByRole("button", { name: /menu/i }).click();
-    await expect(page.getByRole("link", { name: "Breadboard Lab" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Docs" })).toBeVisible();
   });
 });

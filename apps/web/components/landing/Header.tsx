@@ -5,13 +5,12 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button, Container } from "@ds-simboard/design-system";
 
+// Site navigation is deliberately just these two — the unified canvas
+// (docs/architecture/0024-*.md) replaced three separate lab routes, and
+// "Open simulator" below is the third destination, not a fourth link.
 const NAV_LINKS = [
-  { label: "Boards", href: "#boards" },
-  { label: "How it works", href: "#how-it-works" },
-  { label: "Breadboard Lab", href: "/breadboard-lab" },
-  { label: "Arduino Lab", href: "/arduino-lab" },
-  { label: "ESP32 Lab", href: "/esp32-lab" },
-  { label: "Simulator", href: "/simulator" },
+  { label: "Home", href: "/" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export function Header() {
