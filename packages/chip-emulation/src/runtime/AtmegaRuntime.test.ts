@@ -1,5 +1,6 @@
 import { AtmegaRuntime } from "./AtmegaRuntime";
 import { BLINK_PROGRAM } from "../programs/blink";
+import { DIGITAL_PASSTHROUGH_PROGRAM } from "../programs/digitalPassthrough";
 import type { ChipEvent } from "../types";
 
 describe("AtmegaRuntime — the Blink program, running on the real avr8js CPU emulator", () => {
@@ -67,5 +68,48 @@ describe("AtmegaRuntime — the Blink program, running on the real avr8js CPU em
     runtime.runInstructions(1000);
     expect(runtime.cycles).toBe(cyclesBefore);
     expect(runtime.isRunning).toBe(false);
+  });
+
+  it("throws setDigitalInput for a pin outside the modeled digital range", () => {
+    const runtime = new AtmegaRuntime(BLINK_PROGRAM, () => {});
+    expect(() => runtime.setDigitalInput(14, true)).toThrow(RangeError);
+  });
+
+  it("accepts setDigitalInput for a PORTB-range pin (8-13) too, not just PORTD", () => {
+    const runtime = new AtmegaRuntime(BLINK_PROGRAM, () => {});
+    expect(() => runtime.setDigitalInput(9, true)).not.toThrow();
+  });
+});
+
+describe("AtmegaRuntime — the digital-passthrough program, proving genuine bidirectional bridging", () => {
+  it("mirrors a real injected pin 2 input onto pin 13's real output, both ways", () => {
+    const runtime = new AtmegaRuntime(DIGITAL_PASSTHROUGH_PROGRAM, () => {});
+    runtime.start();
+    runtime.runInstructions(10); // let the one-time DDR setup execute
+
+    runtime.setDigitalInput(2, false);
+    runtime.runInstructions(20);
+    expect(runtime.digitalPinValue(13)).toBe(0);
+
+    runtime.setDigitalInput(2, true);
+    runtime.runInstructions(20);
+    expect(runtime.digitalPinValue(13)).toBe(1);
+
+    runtime.setDigitalInput(2, false);
+    runtime.runInstructions(20);
+    expect(runtime.digitalPinValue(13)).toBe(0);
+  });
+
+  it("emits real pin-change events as the injected input actually changes the CPU's output", () => {
+    const events: ChipEvent[] = [];
+    const runtime = new AtmegaRuntime(DIGITAL_PASSTHROUGH_PROGRAM, (e) => events.push(e));
+    runtime.start();
+    runtime.runInstructions(10);
+
+    runtime.setDigitalInput(2, true);
+    runtime.runInstructions(20);
+
+    const pin13Changes = events.filter((e) => e.type === "pin-change" && e.pin === "13");
+    expect(pin13Changes).toContainEqual({ type: "pin-change", pin: "13", value: 1 });
   });
 });

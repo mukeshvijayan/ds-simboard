@@ -88,6 +88,31 @@ export class AtmegaRuntime {
     return value;
   }
 
+  /**
+   * Drives an external digital value into the emulator's real GPIO state
+   * (`avr8js`'s own `AVRIOPort.setPin`) — the input-direction half of
+   * bidirectional pin bridging (docs/architecture/0027-*.md). If the
+   * running program has configured this pin as an input, its next
+   * `digitalRead`-equivalent instruction (`sbic`/`sbis`/`in`) genuinely
+   * observes this value; if configured as output, the CPU's own writes
+   * still win, exactly like real hardware.
+   */
+  setDigitalInput(arduinoPin: number, value: boolean): void {
+    const portDPin = PORTD_PINS.find((p) => p.arduinoPin === arduinoPin);
+    if (portDPin) {
+      this.portD.setPin(portDPin.bit, value);
+      return;
+    }
+    const portBPin = PORTB_PINS.find((p) => p.arduinoPin === arduinoPin);
+    if (portBPin) {
+      this.portB.setPin(portBPin.bit, value);
+      return;
+    }
+    throw new RangeError(
+      `pin ${arduinoPin} is not a modeled digital pin (expected 0-13)`
+    );
+  }
+
   /** Total CPU cycles executed so far. */
   get cycles(): number {
     return this.cpu.cycles;
