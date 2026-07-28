@@ -61,6 +61,21 @@ export class AtmegaRuntime {
     return port.pinState(bit) === PinState.High ? 1 : 0;
   }
 
+  /** Which real `AVRIOPort` + bit a given Arduino pin number maps to. */
+  private portAndBitFor(arduinoPin: number): { port: AVRIOPort; bit: number } {
+    const portDPin = PORTD_PINS.find((p) => p.arduinoPin === arduinoPin);
+    if (portDPin) {
+      return { port: this.portD, bit: portDPin.bit };
+    }
+    const portBPin = PORTB_PINS.find((p) => p.arduinoPin === arduinoPin);
+    if (portBPin) {
+      return { port: this.portB, bit: portBPin.bit };
+    }
+    throw new RangeError(
+      `pin ${arduinoPin} is not a modeled digital pin (expected 0-13)`
+    );
+  }
+
   private pollPinChanges(): void {
     for (const { arduinoPin, bit } of PORTD_PINS) {
       this.emitIfChanged(arduinoPin, this.readBit(this.portD, bit));
@@ -98,19 +113,22 @@ export class AtmegaRuntime {
    * still win, exactly like real hardware.
    */
   setDigitalInput(arduinoPin: number, value: boolean): void {
-    const portDPin = PORTD_PINS.find((p) => p.arduinoPin === arduinoPin);
-    if (portDPin) {
-      this.portD.setPin(portDPin.bit, value);
-      return;
-    }
-    const portBPin = PORTB_PINS.find((p) => p.arduinoPin === arduinoPin);
-    if (portBPin) {
-      this.portB.setPin(portBPin.bit, value);
-      return;
-    }
-    throw new RangeError(
-      `pin ${arduinoPin} is not a modeled digital pin (expected 0-13)`
-    );
+    const { port, bit } = this.portAndBitFor(arduinoPin);
+    port.setPin(bit, value);
+  }
+
+  /**
+   * Whether the running program has configured a pin as input or output
+   * via its real DDR register (`avr8js`'s own `AVRIOPort.pinState`) — the
+   * bridge needs this every tick to know which direction to push data for
+   * a given pin (docs/architecture/0027-*.md).
+   */
+  digitalPinMode(arduinoPin: number): "input" | "output" {
+    const { port, bit } = this.portAndBitFor(arduinoPin);
+    const state = port.pinState(bit);
+    return state === PinState.Input || state === PinState.InputPullUp
+      ? "input"
+      : "output";
   }
 
   /** Total CPU cycles executed so far. */

@@ -112,4 +112,19 @@ describe("AtmegaRuntime — the digital-passthrough program, proving genuine bid
     const pin13Changes = events.filter((e) => e.type === "pin-change" && e.pin === "13");
     expect(pin13Changes).toContainEqual({ type: "pin-change", pin: "13", value: 1 });
   });
+
+  it("reports pin 13 as a real output and pin 2 as a real input, from the CPU's own DDR bits", () => {
+    const runtime = new AtmegaRuntime(DIGITAL_PASSTHROUGH_PROGRAM, () => {});
+    runtime.start();
+    runtime.runInstructions(10); // let the one-time DDR setup execute
+    expect(runtime.digitalPinMode(13)).toBe("output");
+    expect(runtime.digitalPinMode(2)).toBe("input");
+  });
+});
+
+describe("AtmegaRuntime — digitalPinMode", () => {
+  it("throws for a pin outside the modeled digital range", () => {
+    const runtime = new AtmegaRuntime(BLINK_PROGRAM, () => {});
+    expect(() => runtime.digitalPinMode(14)).toThrow(RangeError);
+  });
 });

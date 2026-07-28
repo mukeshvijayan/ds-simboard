@@ -213,6 +213,107 @@ test.describe("Simulator", () => {
     await expect(page.getByText("Closed")).toBeVisible();
   });
 
+  test("an Arduino Uno running Blink lights a real LED wired to pin 13 (P2-3, closing ADR 0027)", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const hole = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).first();
+
+    await page.getByRole("button", { name: "+ Arduino Uno", exact: true }).click();
+    const unoPin = (name: string) =>
+      page.getByRole("button", { name: `Arduino Uno pin ${name}`, exact: true });
+
+    // Base resistor-equivalent for the LED: pin 13 -> a breadboard strip
+    // hole, then the LED from that same column to the Uno's own GND pin —
+    // powered entirely by the board's real GPIO, not the breadboard rails.
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await unoPin("D13").click();
+    await hole("Breadboard hole, row a, column 1").click();
+    await page.getByRole("button", { name: "LED (Red)", exact: true }).click();
+    await hole("Breadboard hole, row b, column 1").click();
+    await unoPin("GND").click();
+
+    // The default breadboard is always present too (its own rails are
+    // "always live," ADR 0006) but otherwise unwired here — tie its
+    // ground to the Uno's so the solver sees one connected circuit, not
+    // two disconnected grounded islands (same requirement as two
+    // unconnected breadboards, ADR 0018).
+    await page.getByRole("button", { name: "Draw wire", exact: true }).click();
+    await unoPin("GND").click();
+    await hole("Breadboard hole, top-negative rail").click();
+
+    // Select the board (clicking its body, not a pin) and start Blink.
+    await page.getByRole("group", { name: "Arduino Uno — drag to move" }).click({
+      position: { x: 200, y: 100 },
+    });
+    await page.getByRole("button", { name: /Stopped \(click to run\)/ }).click();
+    await expect(
+      page.getByRole("button", { name: /Running \(click to stop\)/ })
+    ).toBeVisible();
+
+    // Blink's tuned toggle interval is ~1s (see chip-emulation's
+    // programs/blink.ts) — poll the LED glyph's actual rendered color
+    // until the real, live-stepped avr8js CPU has driven pin 13 high at
+    // least once, lighting it for real (not scripted): lit red is
+    // rgb(214, 69, 69) (#D64545), vs. off's rgb(167, 165, 157) (#A7A59D).
+    const ledGlyph = page.getByRole("button", { name: /^LED led-/ });
+    await expect(ledGlyph).toBeVisible();
+    await expect
+      .poll(async () => ledGlyph.evaluate((el) => getComputedStyle(el).backgroundColor), {
+        timeout: 15_000,
+      })
+      .toBe("rgb(214, 69, 69)");
+    await expect(
+      page.getByRole("button", { name: /^LED led-.*, failed/ })
+    ).not.toBeVisible();
+  });
+
+  test("an ESP32 running its default sketch lights a real LED wired to pin D2, and reports over Serial", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const hole = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).first();
+
+    await page.getByRole("button", { name: "+ ESP32", exact: true }).click();
+    const esp32Pin = (name: string) =>
+      page.getByRole("button", { name: `ESP32 Dev Board pin ${name}`, exact: true });
+
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await esp32Pin("D2").click();
+    await hole("Breadboard hole, row a, column 1").click();
+    await page.getByRole("button", { name: "LED (Red)", exact: true }).click();
+    await hole("Breadboard hole, row b, column 1").click();
+    await esp32Pin("GND").click();
+
+    await page.getByRole("button", { name: "Draw wire", exact: true }).click();
+    await esp32Pin("GND").click();
+    await hole("Breadboard hole, top-negative rail").click();
+
+    await page.getByRole("group", { name: "ESP32 Dev Board — drag to move" }).click({
+      position: { x: 150, y: 30 },
+    });
+    await page.getByRole("button", { name: /Stopped \(click to run\)/ }).click();
+    await expect(
+      page.getByRole("button", { name: /Running \(click to stop\)/ })
+    ).toBeVisible();
+
+    const ledGlyph = page.getByRole("button", { name: /^LED led-/ });
+    await expect(ledGlyph).toBeVisible();
+    await expect
+      .poll(async () => ledGlyph.evaluate((el) => getComputedStyle(el).backgroundColor), {
+        timeout: 15_000,
+      })
+      .toBe("rgb(214, 69, 69)");
+
+    // The default sketch's real Serial.println output — SketchEngine's
+    // interpreter, not avr8js, but the same "genuinely emitted, not
+    // scripted" bar (ADR 0008). Scoped to the serial log (not the code
+    // editor, which also shows the same string as sketch source).
+    await expect(page.getByRole("log").getByText("On-board LED on")).toBeVisible();
+  });
+
   test("has no automatically detectable accessibility violations", async ({ page }) => {
     await page.goto("/simulator");
     const results = await new AxeBuilder({ page }).analyze();
