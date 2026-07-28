@@ -48,13 +48,12 @@ export function createProjectsController(projectsService: ProjectsService) {
       }
     },
 
-    async updateVisibility(req: Request, res: Response) {
+    async update(req: Request, res: Response) {
       try {
-        const project = await projectsService.updateVisibility(
-          req.params.id,
-          req.user!.id,
-          req.body.visibility
-        );
+        const project = await projectsService.updateProject(req.params.id, req.user!.id, {
+          name: req.body.name,
+          visibility: req.body.visibility,
+        });
         res.status(200).json(project);
       } catch (err) {
         handleError(err, res);

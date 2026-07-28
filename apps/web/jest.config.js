@@ -8,5 +8,6 @@ module.exports = {
   testMatch: [
     "<rootDir>/features/**/model/**/*.test.ts",
     "<rootDir>/lib/simulation/**/*.test.ts",
+    "<rootDir>/lib/api/**/*.test.ts",
   ],
 };

@@ -10,7 +10,7 @@ export function createProjectsRoutes(
   router.post("/", requireAuth, (req, res) => controller.create(req, res));
   router.get("/", requireAuth, (req, res) => controller.listForOwner(req, res));
   router.get("/:id", optionalAuth, (req, res) => controller.getById(req, res));
-  router.patch("/:id", requireAuth, (req, res) => controller.updateVisibility(req, res));
+  router.patch("/:id", requireAuth, (req, res) => controller.update(req, res));
   router.delete("/:id", requireAuth, (req, res) => controller.remove(req, res));
   return router;
 }

@@ -22,6 +22,7 @@ import { createComponentDefinitionsRoutes } from "./routes/componentDefinitionsR
 import { createAuthRoutes } from "./routes/authRoutes";
 import { createOptionalAuth, createRequireAuth } from "./middleware/auth";
 import { createRateLimiter } from "./middleware/rateLimiter";
+import { createCors } from "./middleware/cors";
 
 /**
  * Assembles the full controllers/services/repositories/routes stack over
@@ -35,8 +36,17 @@ import { createRateLimiter } from "./middleware/rateLimiter";
  * docs/architecture/0010-*.md) — also passed in rather than read from
  * `process.env` here, so tests can use a fixed test-only secret without
  * depending on environment state.
+ *
+ * `webAppOrigins` is `apps/web`'s real origin(s) for CORS (P2-5, ADR
+ * 0029) — same "passed in, not read from `process.env` here" reasoning;
+ * defaults to the local Next.js dev origin so existing tests/dev usage
+ * don't need to know this parameter exists.
  */
-export function createApp(db: Database, sessionSecret: string): Express {
+export function createApp(
+  db: Database,
+  sessionSecret: string,
+  webAppOrigins: readonly string[] = ["http://localhost:3000"]
+): Express {
   const usersRepository = createUsersRepository(db);
   const projectsRepository = createProjectsRepository(db);
   const circuitSnapshotsRepository = createCircuitSnapshotsRepository(db);
@@ -82,6 +92,7 @@ export function createApp(db: Database, sessionSecret: string): Express {
 
   const app = express();
   app.set("trust proxy", true);
+  app.use(createCors(webAppOrigins));
   app.use(express.json());
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));

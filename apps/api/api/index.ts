@@ -21,7 +21,9 @@ if (!sessionSecret) {
   );
 }
 
+const webAppOrigins = process.env.WEB_APP_ORIGIN?.split(",").map((o) => o.trim());
+
 const db = createProductionDatabase(process.env.DATABASE_URL);
-const app = createApp(db, sessionSecret);
+const app = createApp(db, sessionSecret, webAppOrigins);
 
 export default app;

@@ -18,6 +18,9 @@ import { SketchEngine } from "@/lib/simulation/engine";
 import { ESP32_DEFAULT_SKETCH } from "@/lib/simulation/boards";
 import type { EngineEvent } from "@/lib/simulation/types";
 import type { SerialLine } from "@/lib/simulation/types";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { api, ApiError } from "@/lib/api/client";
+import type { Project } from "@ds-simboard/shared-types";
 import { CanvasSurface } from "./components/CanvasSurface";
 import { BreadboardGlyph } from "./components/BreadboardGlyph";
 import { BoardGlyph } from "./components/BoardGlyph";
@@ -25,11 +28,14 @@ import { PartsPalette } from "./components/PartsPalette";
 import { Inspector } from "./components/Inspector";
 import { BoardInspector } from "./components/BoardInspector";
 import { StatusBanner } from "./components/StatusBanner";
+import { AuthModal } from "./components/AuthModal";
+import { ProjectsModal } from "./components/ProjectsModal";
 import type { InteractionMode } from "./model/interactionMode";
 import type { ConnectionPointRef } from "./model/connectionPoint";
 import { componentHealthEquals, resolveCircuit } from "./model/resolveCircuit";
 import { boardPinElectricalStates } from "./model/boardBridge";
 import { BOARD_DIGITAL_PINS, BOARD_LOGIC_VOLTAGE } from "./model/boardPins";
+import { serializeCanvas, type CanvasSnapshot } from "./model/persistence";
 import { SEVEN_SEGMENT_NAMES } from "./model/types";
 import type {
   BoardPinElectricalState,
@@ -251,6 +257,18 @@ export function Simulator() {
   const [esp32SerialLines, setEsp32SerialLines] = useState<Map<string, SerialLine[]>>(
     new Map()
   );
+
+  // Save/load against apps/api (P2-5, closing ADR 0029).
+  const { user, loading: authLoading, logout } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [saveStatus, setSaveStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "saving" }
+    | { kind: "saved" }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
 
   const result = useMemo(
     () =>
@@ -570,6 +588,87 @@ export function Simulator() {
     if (selectedBoardId === id) setSelectedBoardId(null);
   }
 
+  async function handleSave() {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    let project = currentProject;
+    if (!project) {
+      const name = window.prompt("Name this project:");
+      if (!name || !name.trim()) return;
+      try {
+        project = await api.createProject({ name: name.trim() });
+        setCurrentProject(project);
+      } catch (err) {
+        setSaveStatus({
+          kind: "error",
+          message: err instanceof ApiError ? err.message : "Couldn't create the project.",
+        });
+        return;
+      }
+    }
+
+    setSaveStatus({ kind: "saving" });
+    try {
+      const snapshot = serializeCanvas({
+        breadboards,
+        components,
+        wires,
+        boards,
+        supplyVoltageVolts: supplyVoltage,
+        viewport,
+      });
+      await api.createSnapshot(project.id, snapshot);
+      setSaveStatus({ kind: "saved" });
+    } catch (err) {
+      setSaveStatus({
+        kind: "error",
+        message: err instanceof ApiError ? err.message : "Couldn't save.",
+      });
+    }
+  }
+
+  function handleOpenProject(project: Project, snapshot: CanvasSnapshot | null) {
+    // Stop every running board's engine before replacing canvas state —
+    // otherwise a still-running avr8js/SketchEngine instance from the
+    // *previous* project keeps ticking against boards that no longer
+    // exist in React state.
+    for (const board of boards) {
+      if (board.running) stopBoardEngine(board);
+    }
+
+    setCurrentProject(project);
+    setSaveStatus({ kind: "idle" });
+    setSelectedComponentId(null);
+    setSelectedBoardId(null);
+
+    if (snapshot) {
+      setBreadboards(snapshot.breadboards);
+      setComponents(snapshot.components);
+      setWires(snapshot.wires);
+      setBoards(snapshot.boards);
+      setSupplyVoltage(snapshot.supplyVoltageVolts);
+      setViewport(snapshot.viewport);
+    } else {
+      setBreadboards([DEFAULT_BREADBOARD]);
+      setComponents([]);
+      setWires([]);
+      setBoards([]);
+      setSupplyVoltage(DEFAULT_SUPPLY_VOLTAGE);
+      setViewport(INITIAL_VIEWPORT);
+    }
+  }
+
+  async function handleSignOut() {
+    for (const board of boards) {
+      if (board.running) stopBoardEngine(board);
+    }
+    await logout();
+    setCurrentProject(null);
+    setSaveStatus({ kind: "idle" });
+  }
+
   const pendingPoints: ConnectionPointRef[] =
     mode.kind === "placing"
       ? mode.collectedPoints
@@ -606,6 +705,56 @@ export function Simulator() {
             >
               Reset
             </button>
+            <div className="flex items-center gap-2 border-l border-hairline pl-3">
+              {saveStatus.kind === "saving" && (
+                <span className="text-[12px] text-charcoal-muted">Saving…</span>
+              )}
+              {saveStatus.kind === "saved" && (
+                <span className="text-[12px] text-[#2F6E4F]">Saved</span>
+              )}
+              {saveStatus.kind === "error" && (
+                <span className="text-[12px] text-[#8a3b3b]">{saveStatus.message}</span>
+              )}
+              {currentProject && (
+                <span className="text-[12px] text-charcoal-muted">
+                  {currentProject.name}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                className="rounded-sm border border-navy bg-navy px-3 py-1.5 text-[13px] text-ivory"
+              >
+                Save
+              </button>
+              {!authLoading && user && (
+                <button
+                  type="button"
+                  onClick={() => setShowProjectsModal(true)}
+                  className="rounded-sm border border-hairline px-3 py-1.5 text-[13px] text-charcoal-muted hover:border-charcoal/25 hover:text-charcoal"
+                >
+                  My Projects
+                </button>
+              )}
+              {!authLoading && user && (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="text-[12px] text-charcoal-muted hover:text-charcoal"
+                >
+                  Sign out ({user.email})
+                </button>
+              )}
+              {!authLoading && !user && (
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(true)}
+                  className="rounded-sm border border-hairline px-3 py-1.5 text-[13px] text-charcoal-muted hover:border-charcoal/25 hover:text-charcoal"
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -703,6 +852,15 @@ export function Simulator() {
           )}
         </div>
       </div>
+
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showProjectsModal && (
+        <ProjectsModal
+          onClose={() => setShowProjectsModal(false)}
+          onOpenProject={handleOpenProject}
+          currentProjectId={currentProject?.id ?? null}
+        />
+      )}
     </>
   );
 }

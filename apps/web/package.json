@@ -19,6 +19,7 @@
     "@ds-simboard/circuit-engine": "workspace:*",
     "@ds-simboard/component-library": "workspace:*",
     "@ds-simboard/design-system": "workspace:*",
+    "@ds-simboard/shared-types": "workspace:*",
     "@lezer/highlight": "^1.2.3",
     "@uiw/react-codemirror": "^4.23.6",
     "lucide-react": "^0.454.0",

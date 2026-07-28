@@ -89,28 +89,42 @@ export function createProjectsService(projectsRepository: ProjectsRepository) {
     },
 
     /**
-     * Only the owner may change visibility — this is the "explicit
-     * action" that makes a project unlisted/public; it never happens
-     * implicitly. See docs/architecture/0011-*.md.
+     * Only the owner may rename a project or change its visibility —
+     * changing either is an explicit action, never implicit (same
+     * reasoning as visibility alone, see docs/architecture/0011-*.md).
+     * A single generalized method rather than one per field (P2-5, ADR
+     * 0029) — `patch` only carries whichever field the caller actually
+     * wants to change, and at least one of the two is required.
      */
-    async updateVisibility(
+    async updateProject(
       id: string,
       requestingUserId: string,
-      visibility: ProjectVisibility
+      patch: { name?: string; visibility?: ProjectVisibility }
     ): Promise<Project> {
-      if (!VALID_VISIBILITIES.includes(visibility)) {
+      if (patch.name === undefined && patch.visibility === undefined) {
+        throw new ValidationError("Provide a name or visibility to update");
+      }
+      if (
+        patch.visibility !== undefined &&
+        !VALID_VISIBILITIES.includes(patch.visibility)
+      ) {
         throw new ValidationError(
           `visibility must be one of: ${VALID_VISIBILITIES.join(", ")}`
         );
       }
+      const name = patch.name !== undefined ? validateName(patch.name) : undefined;
+
       const row = await projectsRepository.findById(id);
       if (!row) {
         throw new NotFoundError(`No project with id "${id}"`);
       }
       if (row.ownerId !== requestingUserId) {
-        throw new ForbiddenError("Only the project's owner can change its visibility");
+        throw new ForbiddenError("Only the project's owner can update it");
       }
-      const updated = await projectsRepository.updateVisibility(id, visibility);
+      const updated = await projectsRepository.update(id, {
+        ...(name !== undefined ? { name } : {}),
+        ...(patch.visibility !== undefined ? { visibility: patch.visibility } : {}),
+      });
       if (!updated) {
         // Deleted by another request between the findById above and this
         // update — a genuine (if rare) race, not a scenario worth a

@@ -494,6 +494,72 @@ describe("PATCH /projects/:id (visibility)", () => {
   });
 });
 
+describe("PATCH /projects/:id (rename)", () => {
+  it("lets the owner rename a project", async () => {
+    const { agent, close } = await setup();
+    const created = await agent
+      .post("/projects")
+      .send({ labType: "breadboard", name: "Original name" });
+
+    const res = await agent
+      .patch(`/projects/${created.body.id}`)
+      .send({ name: "Renamed project" });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("Renamed project");
+    await close();
+  });
+
+  it("renames and changes visibility in the same request", async () => {
+    const { agent, close } = await setup();
+    const created = await agent
+      .post("/projects")
+      .send({ labType: "breadboard", name: "Original name" });
+
+    const res = await agent
+      .patch(`/projects/${created.body.id}`)
+      .send({ name: "Renamed and shared", visibility: "unlisted" });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("Renamed and shared");
+    expect(res.body.visibility).toBe("unlisted");
+    await close();
+  });
+
+  it("refuses a non-owner's rename attempt with 403", async () => {
+    const { ownerAgent, otherAgent, close } = await setupTwoUsers();
+    const created = await ownerAgent
+      .post("/projects")
+      .send({ labType: "breadboard", name: "Not yours to rename" });
+
+    const res = await otherAgent
+      .patch(`/projects/${created.body.id}`)
+      .send({ name: "Hijacked name" });
+    expect(res.status).toBe(403);
+    await close();
+  });
+
+  it("rejects an empty name with 400", async () => {
+    const { agent, close } = await setup();
+    const created = await agent
+      .post("/projects")
+      .send({ labType: "breadboard", name: "Original name" });
+
+    const res = await agent.patch(`/projects/${created.body.id}`).send({ name: "   " });
+    expect(res.status).toBe(400);
+    await close();
+  });
+
+  it("rejects a request with neither name nor visibility with 400", async () => {
+    const { agent, close } = await setup();
+    const created = await agent
+      .post("/projects")
+      .send({ labType: "breadboard", name: "Original name" });
+
+    const res = await agent.patch(`/projects/${created.body.id}`).send({});
+    expect(res.status).toBe(400);
+    await close();
+  });
+});
+
 describe("DELETE /projects/:id", () => {
   it("deletes a project when the requester is the owner", async () => {
     const { agent, close } = await setup();

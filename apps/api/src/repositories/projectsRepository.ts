@@ -29,10 +29,17 @@ export function createProjectsRepository(db: Database) {
       await db.delete(projects).where(eq(projects.id, id));
     },
 
-    async updateVisibility(id: string, visibility: "private" | "unlisted" | "public") {
+    /** Partial update — only the fields present in `patch` change. Used
+     * for both renaming and visibility changes (P2-5, ADR 0029), a
+     * single generalized method rather than one per field so a caller
+     * patching both in one request does one update, not two. */
+    async update(
+      id: string,
+      patch: { name?: string; visibility?: "private" | "unlisted" | "public" }
+    ) {
       const [row] = await db
         .update(projects)
-        .set({ visibility, updatedAt: new Date() })
+        .set({ ...patch, updatedAt: new Date() })
         .where(eq(projects.id, id))
         .returning();
       return row ?? null;
