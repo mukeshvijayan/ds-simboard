@@ -52,11 +52,11 @@ export function applyReversePolarityHealth(params: {
 
 /**
  * The shared short-circuit health check (spec Part 2.3): when
- * `circuit-engine`'s `solveSeriesLoopFromGraph` reports a `"short-circuit"`
- * outcome (a loop with no resistive element to limit current), every
- * component in that loop is marked failed — there's no well-defined
- * current to report, only that something in the loop is now damaged.
- * Latches the same way as the other health checks.
+ * `circuit-engine`'s solver reports a `"short-circuit"` outcome (no
+ * resistive element anywhere to limit current), every component involved
+ * is marked failed — there's no well-defined current to report, only
+ * that something is now damaged. Latches the same way as the other
+ * health checks.
  */
 export function applyShortCircuitHealth(previousHealth: HealthState): HealthState {
   if (previousHealth.status === "failed") {

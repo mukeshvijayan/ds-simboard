@@ -1,5 +1,4 @@
 import { CircuitGraph } from "../graph/circuitGraph";
-import { walkSeriesLoop } from "../graph/seriesLoopBridge";
 import { solveMnaFromGraphWithDiodes } from "./mnaDiodeGraphBridge";
 
 describe("solveMnaFromGraphWithDiodes", () => {
@@ -20,15 +19,13 @@ describe("solveMnaFromGraphWithDiodes", () => {
     expect(result.diodeStates.get("led1")).toBe("conducting");
   });
 
-  it("solves two parallel LED branches — a branch-point topology walkSeriesLoop rejects", () => {
+  it("solves two parallel LED branches — a genuine branch-point topology", () => {
     const graph = new CircuitGraph();
     graph.addElement({ id: "battery", nodeA: "positive", nodeB: "ground" });
     graph.addElement({ id: "rA", nodeA: "positive", nodeB: "midA" });
     graph.addElement({ id: "ledA", nodeA: "midA", nodeB: "ground" });
     graph.addElement({ id: "rB", nodeA: "positive", nodeB: "midB" });
     graph.addElement({ id: "ledB", nodeA: "midB", nodeB: "ground" });
-
-    expect(() => walkSeriesLoop(graph, "battery")).toThrow(RangeError);
 
     const resistances: Record<string, number> = { rA: 220, rB: 1000 };
     const result = solveMnaFromGraphWithDiodes(graph, "ground", (id) => {

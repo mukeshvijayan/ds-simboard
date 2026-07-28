@@ -1,9 +1,8 @@
 import { CircuitGraph } from "../graph/circuitGraph";
-import { walkSeriesLoop } from "../graph/seriesLoopBridge";
 import { solveMnaFromGraph } from "./mnaGraphBridge";
 
 describe("solveMnaFromGraph", () => {
-  it("solves a plain series loop via the graph (parity with solveSeriesLoopFromGraph)", () => {
+  it("solves a plain series loop via the graph", () => {
     const graph = new CircuitGraph();
     graph.addElement({ id: "battery", nodeA: "positive", nodeB: "ground" });
     graph.addElement({ id: "r1", nodeA: "positive", nodeB: "ground" });
@@ -18,16 +17,15 @@ describe("solveMnaFromGraph", () => {
     expect(result.elementCurrentsAmps.get("r1")).toBeCloseTo(5 / 220);
   });
 
-  it("solves a genuine branch-point topology that walkSeriesLoop explicitly rejects", () => {
+  it("solves a genuine branch-point topology (two resistors in parallel)", () => {
     // Two resistors both wired straight across the rails — a real
     // breadboard parallel branch. `positive` and `ground` each have
-    // degree 3 here (battery + r1 + r2), which walkSeriesLoop rejects.
+    // degree 3 here (battery + r1 + r2), which the retired series-only
+    // solver (docs/architecture/0021-*.md) rejected outright.
     const graph = new CircuitGraph();
     graph.addElement({ id: "battery", nodeA: "positive", nodeB: "ground" });
     graph.addElement({ id: "r1", nodeA: "positive", nodeB: "ground" });
     graph.addElement({ id: "r2", nodeA: "positive", nodeB: "ground" });
-
-    expect(() => walkSeriesLoop(graph, "battery")).toThrow(RangeError);
 
     const result = solveMnaFromGraph(graph, "ground", (id) =>
       id === "battery"

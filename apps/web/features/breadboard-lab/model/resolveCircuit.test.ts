@@ -46,9 +46,9 @@ describe("resolveCircuit — the golden path (LED + resistor + supply)", () => {
 
   it("lights up and stays nominal with a correctly-sized resistor", () => {
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
-    expect(result.currentAmps).toBeCloseTo((5 - 2) / 220);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo((5 - 2) / 220);
     expect(result.componentResults.get("led1")?.health.status).toBe("nominal");
     expect(
       (result.componentResults.get("led1")?.visual as { brightness: number }).brightness
@@ -71,7 +71,9 @@ describe("resolveCircuit — the golden path (LED + resistor + supply)", () => {
       led("led1", [STRIP_1, NEGATIVE_RAIL], false), // anode on the wrong side
     ];
     const result = resolveCircuit(30, backwards, [], 5);
-    expect(result.status).toBe("non-conducting");
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo(0);
     expect(result.componentResults.get("led1")?.health.status).toBe("nominal");
     expect(
       (result.componentResults.get("led1")?.visual as { brightness: number }).brightness
@@ -92,16 +94,18 @@ describe("resolveCircuit — pushbutton gating the loop", () => {
     resistor("r1", [STRIP_1, NEGATIVE_RAIL]),
   ];
 
-  it("is non-conducting when released", () => {
+  it("carries no current when released", () => {
     const result = resolveCircuit(30, buildComponents(false), [], 5);
-    expect(result.status).toBe("non-conducting");
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo(0);
   });
 
   it("conducts when pressed", () => {
     const result = resolveCircuit(30, buildComponents(true), [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
-    expect(result.currentAmps).toBeCloseTo(5 / 220);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo(5 / 220);
   });
 });
 
@@ -118,9 +122,9 @@ describe("resolveCircuit — potentiometer as a variable resistor", () => {
       },
     ];
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
-    expect(result.currentAmps).toBeCloseTo(5 / 5000);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo(5 / 5000);
   });
 });
 
@@ -133,15 +137,12 @@ describe("resolveCircuit — wires merging holes", () => {
     ];
     const wires = [{ id: "w1", from: POSITIVE_RAIL, to: farHole }];
     const result = resolveCircuit(30, components, wires, 5);
-    expect(result.status).toBe("conducting");
+    expect(result.status).toBe("solved");
   });
 });
 
 describe("resolveCircuit — empty board", () => {
-  it("reports 'empty' rather than 'unsupported-topology' when nothing is placed yet", () => {
-    // A bare board only has the synthetic supply edge, whose two rail
-    // nodes each have degree 1 — that's not a real "unsupported topology"
-    // the user built, it's just an empty board, and should say so.
+  it("reports 'empty' rather than solving a bare supply edge", () => {
     const result = resolveCircuit(30, [], [], 5);
     expect(result.status).toBe("empty");
   });
@@ -164,8 +165,8 @@ describe("resolveCircuit — buzzer as a resistive load", () => {
       },
     ];
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
     expect(
       (result.componentResults.get("bz1")?.visual as { isBuzzing: boolean }).isBuzzing
     ).toBe(true);
@@ -187,8 +188,8 @@ describe("resolveCircuit — buzzer as a resistive load", () => {
       },
     ];
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
     expect(
       (result.componentResults.get("bz1")?.visual as { isBuzzing: boolean }).isBuzzing
     ).toBe(false);
@@ -207,8 +208,8 @@ describe("resolveCircuit — DC motor as a resistive load", () => {
       },
     ];
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
     expect(
       (result.componentResults.get("m1")?.visual as { speedFraction: number })
         .speedFraction
@@ -230,10 +231,10 @@ describe("resolveCircuit — LDR as a light-controlled variable resistor", () =>
     ];
     const dark = resolveCircuit(30, buildComponents(0), [], 5);
     const bright = resolveCircuit(30, buildComponents(1), [], 5);
-    expect(dark.status).toBe("conducting");
-    expect(bright.status).toBe("conducting");
-    if (dark.status !== "conducting" || bright.status !== "conducting") return;
-    expect(bright.currentAmps).toBeGreaterThan(dark.currentAmps);
+    expect(dark.status).toBe("solved");
+    expect(bright.status).toBe("solved");
+    if (dark.status !== "solved" || bright.status !== "solved") return;
+    expect(bright.supplyCurrentAmps).toBeGreaterThan(dark.supplyCurrentAmps);
   });
 });
 
@@ -250,9 +251,9 @@ describe("resolveCircuit — battery holder as a transparent pass-through", () =
       },
     ];
     const result = resolveCircuit(30, components, [], 9);
-    expect(result.status).toBe("conducting");
-    if (result.status !== "conducting") return;
-    expect(result.currentAmps).toBeCloseTo(9 / 220);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBeCloseTo(9 / 220);
     expect(
       (result.componentResults.get("batt1")?.visual as { suppliedVoltageVolts: number })
         .suppliedVoltageVolts
@@ -275,10 +276,11 @@ describe("resolveCircuit — PIR motion sensor as a digital presence switch", ()
     ];
     const noMotion = resolveCircuit(30, buildComponents(false), [], 5);
     const motion = resolveCircuit(30, buildComponents(true), [], 5);
-    expect(noMotion.status).toBe("non-conducting");
-    expect(motion.status).toBe("conducting");
-    if (motion.status !== "conducting") return;
-    expect(motion.currentAmps).toBeCloseTo(5 / 220);
+    expect(noMotion.status).toBe("solved");
+    expect(motion.status).toBe("solved");
+    if (noMotion.status !== "solved" || motion.status !== "solved") return;
+    expect(noMotion.supplyCurrentAmps).toBeCloseTo(0);
+    expect(motion.supplyCurrentAmps).toBeCloseTo(5 / 220);
   });
 });
 
@@ -296,10 +298,10 @@ describe("resolveCircuit — soil moisture sensor as a wetness-controlled variab
     ];
     const dry = resolveCircuit(30, buildComponents(0), [], 5);
     const wet = resolveCircuit(30, buildComponents(1), [], 5);
-    expect(dry.status).toBe("conducting");
-    expect(wet.status).toBe("conducting");
-    if (dry.status !== "conducting" || wet.status !== "conducting") return;
-    expect(wet.currentAmps).toBeGreaterThan(dry.currentAmps);
+    expect(dry.status).toBe("solved");
+    expect(wet.status).toBe("solved");
+    if (dry.status !== "solved" || wet.status !== "solved") return;
+    expect(wet.supplyCurrentAmps).toBeGreaterThan(dry.supplyCurrentAmps);
   });
 });
 
@@ -317,10 +319,10 @@ describe("resolveCircuit — rain sensor as a rainfall-controlled variable resis
     ];
     const dry = resolveCircuit(30, buildComponents(0), [], 5);
     const raining = resolveCircuit(30, buildComponents(1), [], 5);
-    expect(dry.status).toBe("conducting");
-    expect(raining.status).toBe("conducting");
-    if (dry.status !== "conducting" || raining.status !== "conducting") return;
-    expect(raining.currentAmps).toBeGreaterThan(dry.currentAmps);
+    expect(dry.status).toBe("solved");
+    expect(raining.status).toBe("solved");
+    if (dry.status !== "solved" || raining.status !== "solved") return;
+    expect(raining.supplyCurrentAmps).toBeGreaterThan(dry.supplyCurrentAmps);
   });
 });
 
@@ -338,10 +340,10 @@ describe("resolveCircuit — sound sensor as a loudness-controlled variable resi
     ];
     const quiet = resolveCircuit(30, buildComponents(0), [], 5);
     const loud = resolveCircuit(30, buildComponents(1), [], 5);
-    expect(quiet.status).toBe("conducting");
-    expect(loud.status).toBe("conducting");
-    if (quiet.status !== "conducting" || loud.status !== "conducting") return;
-    expect(loud.currentAmps).toBeGreaterThan(quiet.currentAmps);
+    expect(quiet.status).toBe("solved");
+    expect(loud.status).toBe("solved");
+    if (quiet.status !== "solved" || loud.status !== "solved") return;
+    expect(loud.supplyCurrentAmps).toBeGreaterThan(quiet.supplyCurrentAmps);
   });
 });
 
@@ -363,10 +365,10 @@ describe("resolveCircuit — DHT11 as a fixed-current digital sensor load", () =
     ];
     const cool = resolveCircuit(30, buildComponents(10, 20), [], 5);
     const hot = resolveCircuit(30, buildComponents(40, 90), [], 5);
-    expect(cool.status).toBe("conducting");
-    expect(hot.status).toBe("conducting");
-    if (cool.status !== "conducting" || hot.status !== "conducting") return;
-    expect(cool.currentAmps).toBeCloseTo(hot.currentAmps);
+    expect(cool.status).toBe("solved");
+    expect(hot.status).toBe("solved");
+    if (cool.status !== "solved" || hot.status !== "solved") return;
+    expect(cool.supplyCurrentAmps).toBeCloseTo(hot.supplyCurrentAmps);
     expect(
       (hot.componentResults.get("dht1")?.visual as { temperatureCelsius: number })
         .temperatureCelsius
@@ -378,16 +380,37 @@ describe("resolveCircuit — DHT11 as a fixed-current digital sensor load", () =
   });
 });
 
-describe("resolveCircuit — unsupported topology", () => {
-  it("reports an explicit unsupported-topology status for a parallel branch, instead of crashing or mis-solving", () => {
-    // Two resistors both wired straight across the rails — a branch, not a series loop.
+describe("resolveCircuit — parallel branches (A-Engine: previously unsupported, now genuinely solved)", () => {
+  it("solves two resistors wired straight across the rails as a real parallel branch, not a rejected topology", () => {
+    // Before A-Engine (docs/architecture/0018-0021), this exact wiring hit
+    // walkSeriesLoop's degree-2 requirement and reported
+    // "unsupported-topology". The general MNA solver handles it directly.
     const components: PlacedComponent[] = [
       resistor("r1", [POSITIVE_RAIL, NEGATIVE_RAIL]),
       resistor("r2", [POSITIVE_RAIL, NEGATIVE_RAIL]),
     ];
     const result = resolveCircuit(30, components, [], 5);
-    expect(result.status).toBe("unsupported-topology");
-    if (result.status !== "unsupported-topology") return;
-    expect(result.message).toMatch(/complete series loop yet/i);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    // Two 220Ω resistors in parallel: each carries 5/220, combined 10/220.
+    expect(result.supplyCurrentAmps).toBeCloseTo(2 * (5 / 220));
+  });
+
+  it("solves two independent LED+resistor branches off the same rails in one resolve", () => {
+    const components: PlacedComponent[] = [
+      resistor("rA", [POSITIVE_RAIL, STRIP_1]),
+      led("ledA", [STRIP_1, NEGATIVE_RAIL], true),
+      resistor("rB", [POSITIVE_RAIL, { kind: "strip", row: "a", column: 2 }]),
+      led("ledB", [{ kind: "strip", row: "a", column: 2 }, NEGATIVE_RAIL], false), // wired backwards
+    ];
+    const result = resolveCircuit(30, components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(
+      (result.componentResults.get("ledA")?.visual as { brightness: number }).brightness
+    ).toBeGreaterThan(0);
+    expect(
+      (result.componentResults.get("ledB")?.visual as { brightness: number }).brightness
+    ).toBe(0);
   });
 });

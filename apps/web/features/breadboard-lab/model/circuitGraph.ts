@@ -43,10 +43,19 @@ export function buildCircuitGraph(
 
   for (const component of components) {
     const [leadA, leadB] = component.leads;
+    // For a polarized part (LED/diode), the general solver (A-Engine M1/M2)
+    // treats an element's `nodeA` as its anode by convention — orient the
+    // graph edge so that's always true, rather than always defaulting to
+    // `leads[0]` regardless of which lead the user marked positive.
+    const [anodeLead, cathodeLead] =
+      (component.type === "led" || component.type === "diode") &&
+      !component.leadZeroIsPositive
+        ? [leadB, leadA]
+        : [leadA, leadB];
     graph.addElement({
       id: component.id,
-      nodeA: breadboard.nodeIdFor(leadA),
-      nodeB: breadboard.nodeIdFor(leadB),
+      nodeA: breadboard.nodeIdFor(anodeLead),
+      nodeB: breadboard.nodeIdFor(cathodeLead),
     });
   }
 
