@@ -15,6 +15,13 @@
       "when": 1785174969334,
       "tag": "0001_fast_doctor_octopus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785231057248,
+      "tag": "0002_faulty_rumiko_fujikawa",
+      "breakpoints": true
     }
   ]
 }

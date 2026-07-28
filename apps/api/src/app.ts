@@ -5,6 +5,7 @@ import { createProjectsRepository } from "./repositories/projectsRepository";
 import { createCircuitSnapshotsRepository } from "./repositories/circuitSnapshotsRepository";
 import { createComponentDefinitionsRepository } from "./repositories/componentDefinitionsRepository";
 import { createSessionsRepository } from "./repositories/sessionsRepository";
+import { createRateLimitRepository } from "./repositories/rateLimitRepository";
 import { createUsersService } from "./services/usersService";
 import { createProjectsService } from "./services/projectsService";
 import { createCircuitSnapshotsService } from "./services/circuitSnapshotsService";
@@ -20,6 +21,7 @@ import { createCircuitSnapshotsRoutes } from "./routes/circuitSnapshotsRoutes";
 import { createComponentDefinitionsRoutes } from "./routes/componentDefinitionsRoutes";
 import { createAuthRoutes } from "./routes/authRoutes";
 import { createOptionalAuth, createRequireAuth } from "./middleware/auth";
+import { createRateLimiter } from "./middleware/rateLimiter";
 
 /**
  * Assembles the full controllers/services/repositories/routes stack over
@@ -40,6 +42,7 @@ export function createApp(db: Database, sessionSecret: string): Express {
   const circuitSnapshotsRepository = createCircuitSnapshotsRepository(db);
   const componentDefinitionsRepository = createComponentDefinitionsRepository(db);
   const sessionsRepository = createSessionsRepository(db);
+  const rateLimitRepository = createRateLimitRepository(db);
 
   const usersService = createUsersService(usersRepository);
   const projectsService = createProjectsService(projectsRepository);
@@ -62,11 +65,30 @@ export function createApp(db: Database, sessionSecret: string): Express {
   const requireAuth = createRequireAuth(authService, sessionSecret);
   const optionalAuth = createOptionalAuth(authService, sessionSecret);
 
+  // Real client IPs behind Vercel's edge network come through
+  // `x-forwarded-for`, not the raw socket peer — required for the rate
+  // limiters below to key on distinct callers rather than one shared
+  // proxy IP. See docs/architecture/0023-*.md.
+  const signupRateLimiter = createRateLimiter(rateLimitRepository, {
+    routeName: "signup",
+    maxAttempts: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  const loginRateLimiter = createRateLimiter(rateLimitRepository, {
+    routeName: "login",
+    maxAttempts: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+
   const app = express();
+  app.set("trust proxy", true);
   app.use(express.json());
 
   app.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));
-  app.use("/auth", createAuthRoutes(authController, requireAuth));
+  app.use(
+    "/auth",
+    createAuthRoutes(authController, requireAuth, signupRateLimiter, loginRateLimiter)
+  );
   app.use("/users", createUsersRoutes(usersController, requireAuth));
   app.use(
     "/projects",

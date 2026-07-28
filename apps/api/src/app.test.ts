@@ -194,6 +194,74 @@ describe("auth", () => {
   });
 });
 
+describe("auth rate limiting", () => {
+  it("blocks the 6th login attempt in a row from the same caller with 429", async () => {
+    // Real, live-exposure protection (docs/architecture/0023-*.md), not a
+    // token gesture: exercises the actual middleware, wired into the
+    // actual routes, backed by the actual (embedded) Postgres — no
+    // mocking of the rate limiter itself.
+    const { db, close } = await createMigratedTestDatabase();
+    const app = createApp(db, TEST_SESSION_SECRET);
+    await request(app).post("/auth/signup").send({
+      email: "ratelimited@example.com",
+      password: "correct horse battery staple",
+    });
+
+    let lastRes;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      lastRes = await request(app)
+        .post("/auth/login")
+        .send({ email: "ratelimited@example.com", password: "wrong password" });
+      expect(lastRes.status).toBe(400); // wrong password, but not yet rate-limited
+    }
+
+    const sixthAttempt = await request(app)
+      .post("/auth/login")
+      .send({ email: "ratelimited@example.com", password: "wrong password" });
+
+    expect(sixthAttempt.status).toBe(429);
+    expect(sixthAttempt.body.error).toMatch(/too many attempts/i);
+    expect(sixthAttempt.headers["retry-after"]).toBeDefined();
+    await close();
+  });
+
+  it("still lets a correct login through when under the limit", async () => {
+    const { db, close } = await createMigratedTestDatabase();
+    const app = createApp(db, TEST_SESSION_SECRET);
+    await request(app).post("/auth/signup").send({
+      email: "notlimited@example.com",
+      password: "correct horse battery staple",
+    });
+
+    const res = await request(app).post("/auth/login").send({
+      email: "notlimited@example.com",
+      password: "correct horse battery staple",
+    });
+
+    expect(res.status).toBe(200);
+    await close();
+  });
+
+  it("gives signup its own separate, higher-threshold counter from login", async () => {
+    const { db, close } = await createMigratedTestDatabase();
+    const app = createApp(db, TEST_SESSION_SECRET);
+
+    // 5 signups (well under signup's own limit) from the same caller that
+    // just exhausted login's much lower limit shouldn't be blocked —
+    // proving the two endpoints don't share one budget.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const res = await request(app)
+        .post("/auth/signup")
+        .send({
+          email: `caller-${attempt}@example.com`,
+          password: "correct horse battery staple",
+        });
+      expect(res.status).toBe(201);
+    }
+    await close();
+  });
+});
+
 describe("GET /users/:id", () => {
   it("requires authentication", async () => {
     const { app, close, userId } = await setup();

@@ -1,4 +1,12 @@
-import { jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 /** Spec Part 3's three progressive labs. */
 export const labTypeEnum = pgEnum("lab_type", ["breadboard", "arduino", "esp32"]);
@@ -76,4 +84,20 @@ export const componentDefinitions = pgTable("component_definitions", {
   type: text("type").notNull().unique(),
   label: text("label").notNull(),
   defaultParams: jsonb("default_params").notNull(),
+});
+
+/**
+ * Fixed-window rate-limit counters for `/auth/signup` and `/auth/login`
+ * (see docs/architecture/0023-*.md). One row per `key` (e.g.
+ * `"login:203.0.113.5"`) — a shared, persistent counter rather than an
+ * in-memory one, since `apps/api` runs as Vercel serverless functions
+ * (ADR 0015): many concurrent instances with no shared memory, so an
+ * in-memory counter would let each cold-started instance reset its own
+ * count, defeating the limit entirely.
+ */
+export const authRateLimitAttempts = pgTable("auth_rate_limit_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull(),
 });
