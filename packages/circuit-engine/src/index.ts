@@ -24,3 +24,18 @@ export type {
 
 export { solveSeriesLoop } from "./physics/seriesLoop";
 export type { SeriesLoopElement, SeriesLoopOutcome } from "./physics/seriesLoop";
+
+export { solveLinearSystem } from "./mna/linearSystem";
+export type { LinearSolveResult } from "./mna/linearSystem";
+
+export { solveMna } from "./mna/mna";
+export type {
+  MnaNodeId,
+  MnaResistor,
+  MnaVoltageSource,
+  MnaNetwork,
+  MnaSolveResult,
+} from "./mna/mna";
+
+export { solveMnaFromGraph } from "./mna/mnaGraphBridge";
+export type { MnaElementDescriptor } from "./mna/mnaGraphBridge";
