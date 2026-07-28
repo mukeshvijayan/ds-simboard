@@ -58,11 +58,19 @@ import {
   type SoundSensorVisual,
   type TransistorVisual,
 } from "@ds-simboard/component-library";
-import { buildCircuit, SUPPLY_ELEMENT_PREFIX } from "./buildCircuit";
+import {
+  buildCircuit,
+  BOARD_POWER_ELEMENT_PREFIX,
+  boardPinElementId,
+  SUPPLY_ELEMENT_PREFIX,
+} from "./buildCircuit";
 import { componentGraphElements } from "./componentElements";
+import { BOARD_DIGITAL_PINS, BOARD_LOGIC_VOLTAGE } from "./boardPins";
 import {
   SEVEN_SEGMENT_NAMES,
+  type BoardPinElectricalState,
   type CanvasWireModel,
+  type PlacedBoard,
   type PlacedBreadboard,
   type PlacedComponent,
   type PlacedRelay,
@@ -193,6 +201,12 @@ export type ResolveCircuitResult =
        * generalized to possibly-multiple supply edges). */
       supplyCurrentAmps: number;
       componentResults: Map<string, ComponentResult>;
+      /** Every board digital pin's resolved node voltage, keyed
+       * `` `${boardItemId}:${pinName}` `` — read by the live simulation
+       * loop to feed an input-configured Arduino Uno pin's real value
+       * back into `avr8js` (P2-3, docs/architecture/0027-*.md). Only
+       * meaningful for pins the board itself isn't currently driving. */
+      boardPinVoltages: Map<string, number>;
     }
   | { status: "short-circuit"; componentResults: Map<string, ComponentResult> }
   | {
@@ -813,9 +827,11 @@ export function resolveCircuit(
   breadboards: PlacedBreadboard[],
   components: PlacedComponent[],
   wires: CanvasWireModel[],
-  supplyVoltageVolts: number
+  supplyVoltageVolts: number,
+  boards: PlacedBoard[] = [],
+  boardPinStates: ReadonlyMap<string, BoardPinElectricalState> = new Map()
 ): ResolveCircuitResult {
-  const built = buildCircuit(breadboards, components, wires);
+  const built = buildCircuit(breadboards, components, wires, boards);
   if (built.status === "empty") {
     return { status: "empty", componentResults: new Map() };
   }
@@ -830,12 +846,40 @@ export function resolveCircuit(
       ownerByElementId.set(element.elementId, component);
     }
   }
+  const boardByPowerElementId = new Map<string, PlacedBoard>();
+  const boardPinByElementId = new Map<string, { board: PlacedBoard; pinName: string }>();
+  for (const board of boards) {
+    boardByPowerElementId.set(`${BOARD_POWER_ELEMENT_PREFIX}${board.id}`, board);
+    for (const pin of BOARD_DIGITAL_PINS[board.boardType]) {
+      const pinName = `D${pin}`;
+      boardPinByElementId.set(boardPinElementId(board.id, pinName), { board, pinName });
+    }
+  }
 
   const makeDescribeElement =
     (switches: SwitchDecisions) =>
     (elementId: string): MnaDiodeElementDescriptor => {
       if (elementId.startsWith(SUPPLY_ELEMENT_PREFIX)) {
         return { kind: "voltage-source", voltageVolts: supplyVoltageVolts };
+      }
+      const board = boardByPowerElementId.get(elementId);
+      if (board) {
+        return board.running
+          ? { kind: "voltage-source", voltageVolts: BOARD_LOGIC_VOLTAGE[board.boardType] }
+          : { kind: "resistive", resistanceOhms: Infinity };
+      }
+      const boardPin = boardPinByElementId.get(elementId);
+      if (boardPin) {
+        const state = boardPinStates.get(`${boardPin.board.id}:${boardPin.pinName}`);
+        if (state?.kind === "driving") {
+          return {
+            kind: "voltage-source",
+            voltageVolts: state.isHigh
+              ? BOARD_LOGIC_VOLTAGE[boardPin.board.boardType]
+              : 0,
+          };
+        }
+        return { kind: "resistive", resistanceOhms: Infinity };
       }
       const component = ownerByElementId.get(elementId);
       if (!component) {
@@ -925,7 +969,17 @@ export function resolveCircuit(
     }
   }
 
-  return { status: "solved", supplyCurrentAmps, componentResults };
+  const boardPinVoltages = new Map<string, number>();
+  for (const [elementId, { board, pinName }] of boardPinByElementId) {
+    const element = graph.getElement(elementId);
+    if (!element) continue;
+    const voltage =
+      (solved.nodeVoltages.get(element.nodeA) ?? 0) -
+      (solved.nodeVoltages.get(element.nodeB) ?? 0);
+    boardPinVoltages.set(`${board.id}:${pinName}`, voltage);
+  }
+
+  return { status: "solved", supplyCurrentAmps, componentResults, boardPinVoltages };
 }
 
 /** Applies `applyShortCircuitHealth` to every element a component owns —

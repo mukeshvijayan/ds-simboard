@@ -1,10 +1,30 @@
-import { buildCircuit, SUPPLY_ELEMENT_PREFIX } from "./buildCircuit";
-import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./types";
+import {
+  BOARD_POWER_ELEMENT_PREFIX,
+  boardPinElementId,
+  buildCircuit,
+  SUPPLY_ELEMENT_PREFIX,
+} from "./buildCircuit";
+import type {
+  CanvasWireModel,
+  PlacedBoard,
+  PlacedBreadboard,
+  PlacedComponent,
+} from "./types";
 
 const resistorParams = { resistanceOhms: 220, ratedPowerWatts: 0.25 };
 
 function breadboard(id: string): PlacedBreadboard {
   return { id, position: { x: 0, y: 0 }, columns: 30, pixelWidth: 600, pixelHeight: 300 };
+}
+
+function unoBoard(id: string): PlacedBoard {
+  return {
+    id,
+    boardType: "arduinoUno",
+    position: { x: 0, y: 0 },
+    program: "blink",
+    running: true,
+  };
 }
 
 describe("buildCircuit — empty and no-power states", () => {
@@ -437,5 +457,51 @@ describe("buildCircuit — transistor and relay two graph elements (P2-2 part 2,
     expect([...contactNodes].some((n) => coilNodes.has(n))).toBe(false);
     // 1 supply edge + coil + contact
     expect(result.graph.allElements).toHaveLength(3);
+  });
+});
+
+describe("buildCircuit — boards as canvas components (P2-3, closing ADR 0027)", () => {
+  it("reports 'empty' for a bare canvas even with no boards either", () => {
+    expect(buildCircuit([], [], [], [])).toEqual({ status: "empty" });
+  });
+
+  it("uses a board's own GND pin as the ground reference when no breadboard is placed", () => {
+    const board = unoBoard("uno-1");
+    const result = buildCircuit([], [], [], [board]);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+    expect(result.graph.getElement(`${BOARD_POWER_ELEMENT_PREFIX}uno-1`)).toBeDefined();
+    // 14 digital pins (D0-D13) + the power edge
+    expect(result.graph.allElements).toHaveLength(15);
+  });
+
+  it("gives every declared digital pin its own driving/open graph element", () => {
+    const board = unoBoard("uno-1");
+    const result = buildCircuit([], [], [], [board]);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+    expect(result.graph.getElement(boardPinElementId("uno-1", "D13"))).toBeDefined();
+    expect(result.graph.getElement(boardPinElementId("uno-1", "D0"))).toBeDefined();
+  });
+
+  it("shares a ground node between a breadboard and a board once wired together", () => {
+    const bb = breadboard("bb1");
+    const board = unoBoard("uno-1");
+    const wires: CanvasWireModel[] = [
+      {
+        id: "w1",
+        from: {
+          kind: "breadboardHole",
+          boardItemId: "bb1",
+          hole: { kind: "rail", rail: "top-negative" },
+        },
+        to: { kind: "boardPin", boardItemId: "uno-1", pinName: "GND" },
+      },
+    ];
+    const result = buildCircuit([bb], [], wires, [board]);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+    const boardPower = result.graph.getElement(`${BOARD_POWER_ELEMENT_PREFIX}uno-1`);
+    expect(boardPower?.nodeB).toBe(result.groundNodeId);
   });
 });

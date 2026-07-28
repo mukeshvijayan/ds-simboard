@@ -1,5 +1,10 @@
 import { overallHealthStatus, resolveCircuit } from "./resolveCircuit";
-import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "./types";
+import type {
+  CanvasWireModel,
+  PlacedBoard,
+  PlacedBreadboard,
+  PlacedComponent,
+} from "./types";
 import type { ConnectionPointRef } from "./connectionPoint";
 
 const resistorParams = { resistanceOhms: 220, ratedPowerWatts: 0.25 };
@@ -551,5 +556,108 @@ describe("resolveCircuit — relay module, two-phase resolve (P2-2 part 2, closi
     };
     expect(health.coil.status).toBe("failed");
     expect(health.contact.status).toBe("nominal");
+  });
+});
+
+describe("resolveCircuit — boards as canvas components (P2-3, closing ADR 0027)", () => {
+  const unoBoard = (running: boolean): PlacedBoard => ({
+    id: "uno-1",
+    boardType: "arduinoUno",
+    position: { x: 0, y: 0 },
+    program: "blink",
+    running,
+  });
+
+  const boardPin = (boardItemId: string, pinName: string): ConnectionPointRef => ({
+    kind: "boardPin",
+    boardItemId,
+    pinName,
+  });
+
+  const bareLead = (leadName: string): ConnectionPointRef => ({
+    kind: "componentLead",
+    componentItemId: "junction",
+    leadName,
+  });
+
+  it("powers a circuit on its own — no breadboard required — from its own 5V/GND pins", () => {
+    const components: PlacedComponent[] = [
+      resistor("r1", [boardPin("uno-1", "5V"), boardPin("uno-1", "GND")]),
+    ];
+    const result = resolveCircuit([], components, [], 5, [unoBoard(true)]);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.supplyCurrentAmps).toBe(0); // the breadboard-rail-only tally; board supply isn't counted there
+    expect(
+      (result.componentResults.get("r1")?.visual as { powerDissipationWatts: number })
+        .powerDissipationWatts
+    ).toBeCloseTo((5 / 220) * (5 / 220) * 220);
+  });
+
+  it("draws no current from an idle (not-running) board — it has no live 5V/GND", () => {
+    const components: PlacedComponent[] = [
+      resistor("r1", [boardPin("uno-1", "5V"), boardPin("uno-1", "GND")]),
+    ];
+    const result = resolveCircuit([], components, [], 5, [unoBoard(false)]);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(
+      (result.componentResults.get("r1")?.visual as { powerDissipationWatts: number })
+        .powerDissipationWatts
+    ).toBeCloseTo(0);
+  });
+
+  it("drives a live D13 pin HIGH into an LED, lighting it", () => {
+    const components: PlacedComponent[] = [
+      resistor("r1", [boardPin("uno-1", "D13"), bareLead("j1")]),
+      led("led1", [bareLead("j1"), boardPin("uno-1", "GND")], true),
+    ];
+    const result = resolveCircuit(
+      [],
+      components,
+      [],
+      5,
+      [unoBoard(true)],
+      new Map([["uno-1:D13", { kind: "driving", isHigh: true }]])
+    );
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(
+      (result.componentResults.get("led1")?.visual as { brightness: number }).brightness
+    ).toBeGreaterThan(0);
+  });
+
+  it("stays dark when the same pin drives LOW", () => {
+    const components: PlacedComponent[] = [
+      resistor("r1", [boardPin("uno-1", "D13"), bareLead("j1")]),
+      led("led1", [bareLead("j1"), boardPin("uno-1", "GND")], true),
+    ];
+    const result = resolveCircuit(
+      [],
+      components,
+      [],
+      5,
+      [unoBoard(true)],
+      new Map([["uno-1:D13", { kind: "driving", isHigh: false }]])
+    );
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(
+      (result.componentResults.get("led1")?.visual as { brightness: number }).brightness
+    ).toBe(0);
+  });
+
+  it("reports an open (input-configured) pin's real resolved voltage for the live loop to read back", () => {
+    // A pull-up-style divider: 5V -[r1]- D2 -[r2]- GND, with D2 left open
+    // (not driving) — the real, physically-determined voltage at D2 is
+    // what an input-configured pin's `digitalRead` should genuinely see.
+    const components: PlacedComponent[] = [
+      resistor("r1", [boardPin("uno-1", "5V"), boardPin("uno-1", "D2")]),
+      resistor("r2", [boardPin("uno-1", "D2"), boardPin("uno-1", "GND")]),
+    ];
+    const result = resolveCircuit([], components, [], 5, [unoBoard(true)]);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+    expect(result.boardPinVoltages.get("uno-1:D2")).toBeCloseTo(2.5);
   });
 });

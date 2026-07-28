@@ -18,6 +18,7 @@ import type {
   TransistorParams,
 } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "./connectionPoint";
+import type { BoardType } from "./boardPins";
 
 /**
  * The parts placeable on the unified canvas — carried over unchanged
@@ -274,3 +275,45 @@ export interface PlacedBreadboard {
   pixelWidth: number;
   pixelHeight: number;
 }
+
+/**
+ * A board on the canvas (P2-3, closing ADR 0027) — not a `PlacedComponent`
+ * (no `ElectricalModel`/`HealthState`; a board doesn't "burn out" the way
+ * a resistor does). Its pins are real `{kind: "boardPin"}` connection
+ * points, bridged into the circuit graph live, every simulation tick,
+ * while `running` — see `model/boardBridge.ts`.
+ *
+ * Arduino Uno has no live sketch compilation (ADR 0007): `program` picks
+ * between the two precompiled `chip-emulation` demos, not free-typed
+ * source. ESP32 keeps the line-stepping `SketchEngine` interpreter (ADR
+ * 0008) and so does have a free-typed `sketch`.
+ */
+export interface PlacedArduinoUno {
+  id: string;
+  boardType: "arduinoUno";
+  position: { x: number; y: number };
+  program: "blink" | "digitalPassthrough";
+  running: boolean;
+}
+
+export interface PlacedEsp32 {
+  id: string;
+  boardType: "esp32";
+  position: { x: number; y: number };
+  sketch: string;
+  running: boolean;
+}
+
+export type PlacedBoard = PlacedArduinoUno | PlacedEsp32;
+
+export type { BoardType };
+
+/** A board digital pin's electrical role for exactly one simulation tick
+ * (`model/boardBridge.ts` computes this from the board's real running
+ * engine) — `"driving"` when the program has configured it as an output
+ * (a real avr8js DDR bit, or an ESP32 pin that's received at least one
+ * `digitalWrite`), `"open"` otherwise (input-configured, or the board
+ * isn't running), so the rest of the circuit decides that node's voltage
+ * instead of the pin fighting it. See docs/architecture/0027-*.md. */
+export type BoardPinElectricalState =
+  { kind: "driving"; isHigh: boolean } | { kind: "open" };
