@@ -149,9 +149,26 @@ export type {
   CapacitorVisual,
 } from "./components/capacitor/capacitor";
 
-export { evaluateTransistor, transistorModel } from "./components/transistor/transistor";
+export {
+  evaluateTransistor,
+  transistorIsOn,
+  transistorModel,
+} from "./components/transistor/transistor";
 export type {
   TransistorParams,
   TransistorInput,
   TransistorVisual,
 } from "./components/transistor/transistor";
+
+export {
+  evaluateRelayCoil,
+  evaluateRelayContact,
+  relayIsEnergized,
+} from "./components/relay/relay";
+export type {
+  RelayParams,
+  RelayCoilInput,
+  RelayContactInput,
+  RelayCoilVisual,
+  RelayContactVisual,
+} from "./components/relay/relay";

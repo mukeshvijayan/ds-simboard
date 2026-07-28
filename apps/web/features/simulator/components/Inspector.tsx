@@ -242,6 +242,56 @@ export function Inspector({
           </>
         )}
 
+        {component.type === "transistor" && result && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Switch</dt>
+              <dd>
+                {(result.visual as { isOn: boolean }).isOn ? "On (saturated)" : "Off"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Collector current</dt>
+              <dd>
+                {(
+                  (result.visual as { collectorCurrentAmps: number })
+                    .collectorCurrentAmps * 1000
+                ).toFixed(1)}
+                mA
+              </dd>
+            </div>
+          </>
+        )}
+
+        {component.type === "relay" && result && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Coil</dt>
+              <dd>
+                {(
+                  result.visual as {
+                    coil: { visual: { isEnergized: boolean } };
+                  }
+                ).coil.visual.isEnergized
+                  ? "Energized"
+                  : "De-energized"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Contact</dt>
+              <dd>
+                {(
+                  result.visual as {
+                    contact: { visual: { isClosed: boolean } };
+                  }
+                ).contact.visual.isClosed
+                  ? "Closed"
+                  : "Open"}
+              </dd>
+            </div>
+          </>
+        )}
+
         {component.type === "sevenSegmentDisplay" && result && (
           <div className="flex justify-between">
             <dt className="text-charcoal-muted">Segments lit</dt>

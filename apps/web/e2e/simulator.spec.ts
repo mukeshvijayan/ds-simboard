@@ -119,6 +119,100 @@ test.describe("Simulator", () => {
     ).not.toBeVisible();
   });
 
+  test("a transistor switch (3 clicks) turns on and lights its collector-side LED", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const hole = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).first();
+
+    // Transistor needs 3 clicks in order: base, collector, emitter — the
+    // two-phase resolve this test proves (P2-2 part 2, closing ADR
+    // 0022/0026): base current from a first solve decides whether the
+    // collector-emitter branch conducts in a real second solve.
+    await page
+      .getByRole("button", { name: "Transistor (NPN Switch)", exact: true })
+      .click();
+    await expect(page.getByText(/base hole \(1 of 3\)/)).toBeVisible();
+    await hole("Breadboard hole, row a, column 1").click();
+    await expect(page.getByText(/collector hole \(2 of 3\)/)).toBeVisible();
+    await hole("Breadboard hole, row a, column 3").click();
+    await expect(page.getByText(/emitter hole \(3 of 3\)/)).toBeVisible();
+    await hole("Breadboard hole, top-negative rail").click();
+
+    // Base resistor: positive rail -> row b, column 1 (ties to the base).
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await hole("Breadboard hole, top-positive rail").click();
+    await hole("Breadboard hole, row b, column 1").click();
+
+    // Collector-side load: a current-limiting resistor and an LED, tied
+    // to the collector via row b, column 3.
+    await page.getByRole("button", { name: "Resistor (330Ω)", exact: true }).click();
+    await hole("Breadboard hole, top-positive rail").click();
+    await hole("Breadboard hole, row a, column 5").click();
+    await page.getByRole("button", { name: "LED (Red)", exact: true }).click();
+    await hole("Breadboard hole, row b, column 5").click(); // anode
+    await hole("Breadboard hole, row b, column 3").click(); // cathode, ties to collector
+
+    await expect(page.getByRole("status")).toHaveText(/Circuit is live/);
+    await expect(page.getByRole("button", { name: /^LED led-/ })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^LED led-.*, failed/ })
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Transistor \(NPN Switch\) transistor-/ })
+    ).toBeVisible();
+  });
+
+  test("placing a relay module (4 clicks) energizes the coil and closes the contact", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+    const hole = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).first();
+    // The relay's glyph is centered on its 4 leads' centroid — since two
+    // of those leads sit on the rails, its glyph can end up overlapping a
+    // rail hole near the start of the board. `.last()` picks a rail hole
+    // far enough along the board to stay clear of it.
+    const railHoleFarFromGlyph = (label: string) =>
+      page.getByRole("button", { name: label, exact: true }).last();
+
+    // Relay needs 4 clicks in order: coil lead 1, coil lead 2, common
+    // contact, normally-open contact — the coil and contact branches
+    // deliberately share no node (docs/architecture/0026-*.md). The
+    // common contact ties to the positive rail too (a relay's contact
+    // pole is often wired to the same supply as its coil), so once the
+    // coil pulls the contact closed, the load resistor below completes a
+    // real second, independent current path.
+    await page.getByRole("button", { name: "Relay Module", exact: true }).click();
+    await expect(page.getByText(/coil lead 1 hole \(1 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, top-positive rail").click();
+    await expect(page.getByText(/coil lead 2 hole \(2 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, top-negative rail").click();
+    await expect(page.getByText(/common contact hole \(3 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, top-positive rail").click();
+    await expect(page.getByText(/normally-open contact hole \(4 of 4\)/)).toBeVisible();
+    await hole("Breadboard hole, row a, column 1").click();
+
+    // Load resistor: row b, column 1 (ties to the contact) -> negative rail.
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await hole("Breadboard hole, row b, column 1").click();
+    await railHoleFarFromGlyph("Breadboard hole, top-negative rail").click();
+
+    await expect(page.getByRole("status")).toHaveText(/Circuit is live/);
+    const relayButton = page.getByRole("button", { name: /^Relay Module relay-/ });
+    await expect(relayButton).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Relay Module relay-.*, failed/ })
+    ).not.toBeVisible();
+
+    // Select it to confirm the coil actually energized and closed the
+    // contact — the two-phase resolve's real, observable outcome.
+    await relayButton.click();
+    await expect(page.getByText("Energized")).toBeVisible();
+    await expect(page.getByText("Closed")).toBeVisible();
+  });
+
   test("has no automatically detectable accessibility violations", async ({ page }) => {
     await page.goto("/simulator");
     const results = await new AxeBuilder({ page }).analyze();

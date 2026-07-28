@@ -1,4 +1,5 @@
 import {
+  type CircuitGraph,
   type MnaDiodeElementDescriptor,
   type MnaDiodeSolveResult,
   solveMnaFromGraphWithDiodes,
@@ -20,17 +21,22 @@ import {
   evaluatePotentiometer,
   evaluatePushbutton,
   evaluateRainSensor,
+  evaluateRelayCoil,
+  evaluateRelayContact,
   evaluateResistor,
   evaluateSoilMoistureSensor,
   evaluateSoundSensor,
+  evaluateTransistor,
   ldrSeriesElement,
   motionSensorSeriesElement,
   potentiometerSeriesElement,
   pushbuttonSeriesElement,
   rainSensorSeriesElement,
+  relayIsEnergized,
   resistorSeriesElement,
   soilMoistureSensorSeriesElement,
   soundSensorSeriesElement,
+  transistorIsOn,
   type BatteryHolderVisual,
   type BuzzerVisual,
   type DcMotorVisual,
@@ -45,9 +51,12 @@ import {
   type PotentiometerVisual,
   type PushbuttonVisual,
   type RainSensorVisual,
+  type RelayCoilVisual,
+  type RelayContactVisual,
   type ResistorVisual,
   type SoilMoistureSensorVisual,
   type SoundSensorVisual,
+  type TransistorVisual,
 } from "@ds-simboard/component-library";
 import { buildCircuit, SUPPLY_ELEMENT_PREFIX } from "./buildCircuit";
 import { componentGraphElements } from "./componentElements";
@@ -56,8 +65,10 @@ import {
   type CanvasWireModel,
   type PlacedBreadboard,
   type PlacedComponent,
+  type PlacedRelay,
   type PlacedRgbLed,
   type PlacedSevenSegmentDisplay,
+  type PlacedTransistor,
   type SevenSegmentName,
 } from "./types";
 
@@ -69,6 +80,14 @@ export interface RgbLedVisual {
 
 export interface SevenSegmentVisual {
   segments: Record<SevenSegmentName, { health: HealthState; visual: LedVisual }>;
+}
+
+/** A relay's coil and contact are physically separate failure modes
+ * (docs/architecture/0026-*.md), each with its own `HealthState` — same
+ * per-channel shape as `RgbLedVisual`. */
+export interface RelayVisual {
+  coil: { health: HealthState; visual: RelayCoilVisual };
+  contact: { health: HealthState; visual: RelayContactVisual };
 }
 
 export type ComponentVisual =
@@ -87,7 +106,9 @@ export type ComponentVisual =
   | SoundSensorVisual
   | Dht11Visual
   | RgbLedVisual
-  | SevenSegmentVisual;
+  | SevenSegmentVisual
+  | TransistorVisual
+  | RelayVisual;
 
 /** A multi-lead component's `health` is per-channel (a real LED die can
  * fail independently of its neighbors sharing one package) — not every
@@ -95,7 +116,8 @@ export type ComponentVisual =
 export type ComponentHealth =
   | HealthState
   | { red: HealthState; green: HealthState; blue: HealthState }
-  | Record<SevenSegmentName, HealthState>;
+  | Record<SevenSegmentName, HealthState>
+  | { coil: HealthState; contact: HealthState };
 
 export interface ComponentResult {
   health: ComponentHealth;
@@ -403,9 +425,27 @@ function describeLedLikeElement(
   };
 }
 
+/**
+ * The switch-state decision made from Phase 1's real solved control
+ * current (docs/architecture/0026-*.md) — empty maps mean "assume every
+ * switch open," Phase 1's own starting assumption; `?? false` below reads
+ * that the same way whether the map is empty or just doesn't mention a
+ * given component.
+ */
+interface SwitchDecisions {
+  transistorOn: ReadonlyMap<string, boolean>;
+  relayEnergized: ReadonlyMap<string, boolean>;
+}
+
+const NO_SWITCH_DECISIONS: SwitchDecisions = {
+  transistorOn: new Map(),
+  relayEnergized: new Map(),
+};
+
 function describeElement(
   elementId: string,
-  component: PlacedComponent
+  component: PlacedComponent,
+  switches: SwitchDecisions
 ): MnaDiodeElementDescriptor {
   if (component.type === "led" || component.type === "diode") {
     return describeLedLikeElement(component.params, component.health);
@@ -417,6 +457,39 @@ function describeElement(
   if (component.type === "sevenSegmentDisplay") {
     const segment = elementId.slice(component.id.length + 1) as SevenSegmentName;
     return describeLedLikeElement(component.params.segment, component.health[segment]);
+  }
+  if (component.type === "transistor") {
+    if (elementId.endsWith(":be")) {
+      if (component.health.status === "failed") {
+        return { kind: "resistive", resistanceOhms: Infinity };
+      }
+      return {
+        kind: "diode",
+        forwardVoltageVolts: component.params.baseEmitterVoltageDropVolts,
+        reverseResistanceOhms: Infinity,
+      };
+    }
+    const isOn = switches.transistorOn.get(component.id) ?? false;
+    if (!isOn || component.health.status === "failed") {
+      return { kind: "resistive", resistanceOhms: Infinity };
+    }
+    return { kind: "resistive", resistanceOhms: component.params.onResistanceOhms };
+  }
+  if (component.type === "relay") {
+    if (elementId.endsWith(":coil")) {
+      if (component.health.coil.status === "failed") {
+        return { kind: "resistive", resistanceOhms: Infinity };
+      }
+      return { kind: "resistive", resistanceOhms: component.params.coilResistanceOhms };
+    }
+    const isEnergized = switches.relayEnergized.get(component.id) ?? false;
+    if (!isEnergized || component.health.contact.status === "failed") {
+      return { kind: "resistive", resistanceOhms: Infinity };
+    }
+    return {
+      kind: "resistive",
+      resistanceOhms: component.params.contactOnResistanceOhms,
+    };
   }
   switch (component.type) {
     case "resistor":
@@ -544,6 +617,51 @@ function evaluateSevenSegment(
   };
 }
 
+/** A branch's real current, from whichever describes it — a plain
+ * resistive branch's current is always signed "forward" (it has no
+ * blocking state), so this is just `outcome.currentAmps` guarded the same
+ * way `evaluateComponent`'s other resistive branches already are. */
+function currentAmpsOf(outcome: ElementOutcome): number {
+  return outcome.isForward ? outcome.currentAmps : 0;
+}
+
+function evaluateTransistorComponent(
+  component: PlacedTransistor,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const baseCurrentAmps = currentAmpsOf(getOutcome(`${component.id}:be`));
+  const collectorCurrentAmps = currentAmpsOf(getOutcome(`${component.id}:ce`));
+  const result = evaluateTransistor(
+    component.params,
+    { baseCurrentAmps, collectorCurrentAmps },
+    { health: component.health }
+  );
+  return { health: result.health, visual: result.visual };
+}
+
+function evaluateRelayComponent(
+  component: PlacedRelay,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const coilCurrentAmps = currentAmpsOf(getOutcome(`${component.id}:coil`));
+  const contactCurrentAmps = currentAmpsOf(getOutcome(`${component.id}:contact`));
+  const coilResult = evaluateRelayCoil(
+    component.params,
+    { currentAmps: coilCurrentAmps },
+    { health: component.health.coil }
+  );
+  const contactResult = evaluateRelayContact(
+    component.params,
+    { currentAmps: contactCurrentAmps },
+    { health: component.health.contact },
+    relayIsEnergized(component.params, coilCurrentAmps)
+  );
+  return {
+    health: { coil: coilResult.health, contact: contactResult.health },
+    visual: { coil: coilResult, contact: contactResult },
+  };
+}
+
 function evaluateComponent(
   component: PlacedComponent,
   getOutcome: (elementId: string) => ElementOutcome,
@@ -554,6 +672,12 @@ function evaluateComponent(
   }
   if (component.type === "sevenSegmentDisplay") {
     return evaluateSevenSegment(component, getOutcome);
+  }
+  if (component.type === "transistor") {
+    return evaluateTransistorComponent(component, getOutcome);
+  }
+  if (component.type === "relay") {
+    return evaluateRelayComponent(component, getOutcome);
   }
   if (component.type === "led" || component.type === "diode") {
     const outcome = getOutcome(component.id);
@@ -577,6 +701,114 @@ function evaluateComponent(
  * per spec Part 1. Multi-lead components (P2-2) evaluate each of their
  * channels the same way, via `componentGraphElements`.
  */
+/** A branch's real outcome from an already-solved network — standalone
+ * (not a closure) so both Phase 1 (reading a transistor/relay's control
+ * current) and the final evaluate pass can use it against whichever
+ * solve is the relevant one. See docs/architecture/0026-*.md. */
+function outcomeFor(
+  solved: MnaDiodeSolveResult & { kind: "solved" },
+  graph: CircuitGraph,
+  elementId: string
+): ElementOutcome {
+  const diodeState = solved.diodeStates.get(elementId);
+  if (diodeState === undefined) {
+    // A plain resistive element (not a diode-like branch at all).
+    return {
+      currentAmps: solved.elementCurrentsAmps.get(elementId) ?? 0,
+      isForward: true,
+      voltageAcross: 0,
+    };
+  }
+  if (diodeState === "conducting") {
+    return {
+      currentAmps: solved.elementCurrentsAmps.get(elementId) as number,
+      isForward: true,
+      voltageAcross: 0,
+    };
+  }
+  const element = graph.getElement(elementId);
+  const voltageAcross =
+    element === undefined
+      ? 0
+      : (solved.nodeVoltages.get(element.nodeA) ?? 0) -
+        (solved.nodeVoltages.get(element.nodeB) ?? 0);
+  return { currentAmps: 0, isForward: false, voltageAcross };
+}
+
+/** Solves the graph once with the given `describeElement`, and — if the
+ * result is anything other than a clean "solved" — immediately produces
+ * the final `ResolveCircuitResult` for it (short-circuit/non-convergent/
+ * unresolvable), exactly the same handling regardless of which phase of
+ * the two-phase resolve (docs/architecture/0026-*.md) called it. */
+function solveGraphOrReport(
+  graph: CircuitGraph,
+  groundNodeId: string,
+  describeElementFn: (elementId: string) => MnaDiodeElementDescriptor,
+  components: PlacedComponent[],
+  supplyVoltageVolts: number
+):
+  | { solved: MnaDiodeSolveResult & { kind: "solved" } }
+  | { earlyResult: ResolveCircuitResult } {
+  let outcome: MnaDiodeSolveResult;
+  try {
+    outcome = solveMnaFromGraphWithDiodes(graph, groundNodeId, describeElementFn);
+  } catch (err) {
+    // A second, ground-disconnected breadboard with its own supply edge
+    // is the one case `solveMna` itself rejects outright (see ADR
+    // 0018) — an honest "not resolvable as one circuit" rather than a
+    // crash.
+    const message =
+      err instanceof Error
+        ? err.message
+        : "This wiring isn't resolvable as one connected circuit yet.";
+    return {
+      earlyResult: { status: "unresolved", message, componentResults: new Map() },
+    };
+  }
+
+  if (outcome.kind === "short-circuit") {
+    const forcedForward: ElementOutcome = {
+      currentAmps: 0,
+      isForward: true,
+      voltageAcross: 0,
+    };
+    const componentResults = new Map<string, ComponentResult>();
+    for (const component of components) {
+      const failedComponent = withShortCircuitHealth(component);
+      componentResults.set(
+        component.id,
+        evaluateComponent(failedComponent, () => forcedForward, supplyVoltageVolts)
+      );
+    }
+    return { earlyResult: { status: "short-circuit", componentResults } };
+  }
+
+  if (outcome.kind === "non-convergent") {
+    const forcedReverse: ElementOutcome = {
+      currentAmps: 0,
+      isForward: false,
+      voltageAcross: 0,
+    };
+    const componentResults = new Map<string, ComponentResult>();
+    for (const component of components) {
+      componentResults.set(
+        component.id,
+        evaluateComponent(component, () => forcedReverse, supplyVoltageVolts)
+      );
+    }
+    return {
+      earlyResult: {
+        status: "unresolved",
+        message:
+          "This wiring couldn't be resolved to a stable answer — try a simpler arrangement.",
+        componentResults,
+      },
+    };
+  }
+
+  return { solved: outcome };
+}
+
 export function resolveCircuit(
   breadboards: PlacedBreadboard[],
   components: PlacedComponent[],
@@ -599,9 +831,9 @@ export function resolveCircuit(
     }
   }
 
-  let outcome: MnaDiodeSolveResult;
-  try {
-    outcome = solveMnaFromGraphWithDiodes(graph, groundNodeId, (elementId) => {
+  const makeDescribeElement =
+    (switches: SwitchDecisions) =>
+    (elementId: string): MnaDiodeElementDescriptor => {
       if (elementId.startsWith(SUPPLY_ELEMENT_PREFIX)) {
         return { kind: "voltage-source", voltageVolts: supplyVoltageVolts };
       }
@@ -609,84 +841,70 @@ export function resolveCircuit(
       if (!component) {
         throw new RangeError(`no placed component owns graph element "${elementId}"`);
       }
-      return describeElement(elementId, component);
-    });
-  } catch (err) {
-    // A second, ground-disconnected breadboard with its own supply edge
-    // is the one case `solveMna` itself rejects outright (see ADR
-    // 0018) — an honest "not resolvable as one circuit" rather than a
-    // crash.
-    const message =
-      err instanceof Error
-        ? err.message
-        : "This wiring isn't resolvable as one connected circuit yet.";
-    return { status: "unresolved", message, componentResults: new Map() };
+      return describeElement(elementId, component, switches);
+    };
+
+  // Phase 1 (docs/architecture/0026-*.md): solve with every transistor's
+  // collector-emitter branch and every relay's contact branch assumed
+  // open, to get each one's real control-branch current.
+  const phase1 = solveGraphOrReport(
+    graph,
+    groundNodeId,
+    makeDescribeElement(NO_SWITCH_DECISIONS),
+    components,
+    supplyVoltageVolts
+  );
+  if ("earlyResult" in phase1) {
+    return phase1.earlyResult;
+  }
+
+  const transistorOn = new Map<string, boolean>();
+  const relayEnergized = new Map<string, boolean>();
+  for (const component of components) {
+    if (component.type === "transistor") {
+      const baseCurrentAmps = outcomeFor(
+        phase1.solved,
+        graph,
+        `${component.id}:be`
+      ).currentAmps;
+      transistorOn.set(component.id, transistorIsOn(component.params, baseCurrentAmps));
+    } else if (component.type === "relay") {
+      const coilCurrentAmps = outcomeFor(
+        phase1.solved,
+        graph,
+        `${component.id}:coil`
+      ).currentAmps;
+      relayEnergized.set(
+        component.id,
+        relayIsEnergized(component.params, coilCurrentAmps)
+      );
+    }
+  }
+
+  // Phase 2: re-solve once with the decided switch states baked in — only
+  // when there's a decision to bake in; with none, Phase 1's result is
+  // already final (same single-solve cost as before this component pair
+  // existed).
+  let solved: MnaDiodeSolveResult & { kind: "solved" };
+  if (transistorOn.size === 0 && relayEnergized.size === 0) {
+    solved = phase1.solved;
+  } else {
+    const phase2 = solveGraphOrReport(
+      graph,
+      groundNodeId,
+      makeDescribeElement({ transistorOn, relayEnergized }),
+      components,
+      supplyVoltageVolts
+    );
+    if ("earlyResult" in phase2) {
+      return phase2.earlyResult;
+    }
+    solved = phase2.solved;
   }
 
   const componentResults = new Map<string, ComponentResult>();
-
-  if (outcome.kind === "short-circuit") {
-    const forcedForward: ElementOutcome = {
-      currentAmps: 0,
-      isForward: true,
-      voltageAcross: 0,
-    };
-    for (const component of components) {
-      const failedComponent = withShortCircuitHealth(component);
-      componentResults.set(
-        component.id,
-        evaluateComponent(failedComponent, () => forcedForward, supplyVoltageVolts)
-      );
-    }
-    return { status: "short-circuit", componentResults };
-  }
-
-  if (outcome.kind === "non-convergent") {
-    const forcedReverse: ElementOutcome = {
-      currentAmps: 0,
-      isForward: false,
-      voltageAcross: 0,
-    };
-    for (const component of components) {
-      componentResults.set(
-        component.id,
-        evaluateComponent(component, () => forcedReverse, supplyVoltageVolts)
-      );
-    }
-    return {
-      status: "unresolved",
-      message:
-        "This wiring couldn't be resolved to a stable answer — try a simpler arrangement.",
-      componentResults,
-    };
-  }
-
-  const solved = outcome;
-  const getOutcomeFor = (elementId: string): ElementOutcome => {
-    const diodeState = solved.diodeStates.get(elementId);
-    if (diodeState === undefined) {
-      // A plain resistive element (not a diode-like branch at all).
-      return {
-        currentAmps: solved.elementCurrentsAmps.get(elementId) ?? 0,
-        isForward: true,
-        voltageAcross: 0,
-      };
-    }
-    if (diodeState === "conducting") {
-      return {
-        currentAmps: solved.elementCurrentsAmps.get(elementId) as number,
-        isForward: true,
-        voltageAcross: 0,
-      };
-    }
-    const element = graph.getElement(elementId);
-    const voltageAcross =
-      element === undefined
-        ? 0
-        : (solved.nodeVoltages.get(element.nodeA) ?? 0) -
-          (solved.nodeVoltages.get(element.nodeB) ?? 0);
-    return { currentAmps: 0, isForward: false, voltageAcross };
-  };
+  const getOutcomeFor = (elementId: string): ElementOutcome =>
+    outcomeFor(solved, graph, elementId);
 
   for (const component of components) {
     componentResults.set(
@@ -731,6 +949,15 @@ function withShortCircuitHealth(component: PlacedComponent): PlacedComponent {
       health[name] = applyShortCircuitHealth(component.health[name]);
     }
     return { ...component, health };
+  }
+  if (component.type === "relay") {
+    return {
+      ...component,
+      health: {
+        coil: applyShortCircuitHealth(component.health.coil),
+        contact: applyShortCircuitHealth(component.health.contact),
+      },
+    };
   }
   return {
     ...component,

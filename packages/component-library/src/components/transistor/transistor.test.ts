@@ -1,48 +1,44 @@
 import { NOMINAL_HEALTH } from "../../contract/types";
-import { evaluateTransistor } from "./transistor";
+import { evaluateTransistor, transistorIsOn } from "./transistor";
 
 const params = {
-  polarity: "NPN" as const,
-  hFE: 100,
-  vceSatVolts: 0.2,
+  baseEmitterVoltageDropVolts: 0.7,
+  baseThresholdCurrentAmps: 0.002,
+  onResistanceOhms: 1,
   maxCollectorCurrentAmps: 0.5,
 };
 
-describe("evaluateTransistor — amplifier region (unsaturated)", () => {
-  it("amplifies base current by hFE when the collector circuit can supply it", () => {
-    // Ic_sat ceiling = (12 - 0.2) / 100 = 0.118A; hFE*Ib = 100*0.0005 = 0.05A, well under the ceiling.
-    const result = evaluateTransistor(
-      params,
-      { baseCurrentAmps: 0.0005, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
-      { health: NOMINAL_HEALTH }
-    );
-    expect(result.visual.collectorCurrentAmps).toBeCloseTo(0.05);
-    expect(result.visual.isSaturated).toBe(false);
-    expect(result.visual.isConducting).toBe(true);
+describe("transistorIsOn", () => {
+  it("is off below the base current threshold", () => {
+    expect(transistorIsOn(params, 0.001)).toBe(false);
   });
 
-  it("is off (not conducting) at 0 base current", () => {
-    const result = evaluateTransistor(
-      params,
-      { baseCurrentAmps: 0, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
-      { health: NOMINAL_HEALTH }
-    );
-    expect(result.visual.collectorCurrentAmps).toBe(0);
-    expect(result.visual.isConducting).toBe(false);
-    expect(result.visual.isSaturated).toBe(false);
+  it("is on at or above the base current threshold", () => {
+    expect(transistorIsOn(params, 0.002)).toBe(true);
+    expect(transistorIsOn(params, 0.01)).toBe(true);
   });
 });
 
-describe("evaluateTransistor — saturation region (switch fully on)", () => {
-  it("caps collector current at what the collector circuit can supply", () => {
-    // hFE*Ib = 100*0.01 = 1A "wanted", but (12-0.2)/100 = 0.118A is all the circuit can give.
+describe("evaluateTransistor — switching on real solved current", () => {
+  it("reports on with the collector current the solver actually found", () => {
     const result = evaluateTransistor(
       params,
-      { baseCurrentAmps: 0.01, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+      { baseCurrentAmps: 0.005, collectorCurrentAmps: 0.12 },
       { health: NOMINAL_HEALTH }
     );
-    expect(result.visual.collectorCurrentAmps).toBeCloseTo((12 - 0.2) / 100);
-    expect(result.visual.isSaturated).toBe(true);
+    expect(result.visual.isOn).toBe(true);
+    expect(result.visual.collectorCurrentAmps).toBe(0.12);
+    expect(result.health.status).toBe("nominal");
+  });
+
+  it("reports off when base current is below threshold, regardless of collector current", () => {
+    const result = evaluateTransistor(
+      params,
+      { baseCurrentAmps: 0, collectorCurrentAmps: 0 },
+      { health: NOMINAL_HEALTH }
+    );
+    expect(result.visual.isOn).toBe(false);
+    expect(result.visual.collectorCurrentAmps).toBe(0);
   });
 });
 
@@ -50,17 +46,19 @@ describe("evaluateTransistor — over-current failure", () => {
   it("fails once collector current exceeds the max rating", () => {
     const result = evaluateTransistor(
       { ...params, maxCollectorCurrentAmps: 0.05 },
-      { baseCurrentAmps: 0.01, supplyVoltageVolts: 12, collectorResistanceOhms: 10 },
+      { baseCurrentAmps: 0.01, collectorCurrentAmps: 0.12 },
       { health: NOMINAL_HEALTH }
     );
     expect(result.health.status).toBe("failed");
+    expect(result.visual.isOn).toBe(false);
+    expect(result.visual.collectorCurrentAmps).toBe(0);
   });
 
   it("latches failed", () => {
     const failed = { status: "failed" as const, reason: "over-current" };
     const result = evaluateTransistor(
       params,
-      { baseCurrentAmps: 0, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+      { baseCurrentAmps: 0, collectorCurrentAmps: 0 },
       { health: failed }
     );
     expect(result.health).toBe(failed);
@@ -68,21 +66,31 @@ describe("evaluateTransistor — over-current failure", () => {
 });
 
 describe("evaluateTransistor — validation", () => {
-  it("throws for a non-positive hFE", () => {
+  it("throws for a negative baseEmitterVoltageDropVolts", () => {
     expect(() =>
       evaluateTransistor(
-        { ...params, hFE: 0 },
-        { baseCurrentAmps: 0.001, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+        { ...params, baseEmitterVoltageDropVolts: -1 },
+        { baseCurrentAmps: 0.005, collectorCurrentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
     ).toThrow(RangeError);
   });
 
-  it("throws for a negative vceSatVolts", () => {
+  it("throws for a non-positive baseThresholdCurrentAmps", () => {
     expect(() =>
       evaluateTransistor(
-        { ...params, vceSatVolts: -1 },
-        { baseCurrentAmps: 0.001, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+        { ...params, baseThresholdCurrentAmps: 0 },
+        { baseCurrentAmps: 0.005, collectorCurrentAmps: 0.01 },
+        { health: NOMINAL_HEALTH }
+      )
+    ).toThrow(RangeError);
+  });
+
+  it("throws for a non-positive onResistanceOhms", () => {
+    expect(() =>
+      evaluateTransistor(
+        { ...params, onResistanceOhms: 0 },
+        { baseCurrentAmps: 0.005, collectorCurrentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
     ).toThrow(RangeError);
@@ -92,7 +100,7 @@ describe("evaluateTransistor — validation", () => {
     expect(() =>
       evaluateTransistor(
         { ...params, maxCollectorCurrentAmps: 0 },
-        { baseCurrentAmps: 0.001, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+        { baseCurrentAmps: 0.005, collectorCurrentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
     ).toThrow(RangeError);
@@ -102,27 +110,17 @@ describe("evaluateTransistor — validation", () => {
     expect(() =>
       evaluateTransistor(
         params,
-        { baseCurrentAmps: -0.001, supplyVoltageVolts: 12, collectorResistanceOhms: 100 },
+        { baseCurrentAmps: -0.001, collectorCurrentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
     ).toThrow(RangeError);
   });
 
-  it("throws for a negative supply voltage", () => {
+  it("throws for a negative collector current", () => {
     expect(() =>
       evaluateTransistor(
         params,
-        { baseCurrentAmps: 0.001, supplyVoltageVolts: -1, collectorResistanceOhms: 100 },
-        { health: NOMINAL_HEALTH }
-      )
-    ).toThrow(RangeError);
-  });
-
-  it("throws for a non-positive collector resistance", () => {
-    expect(() =>
-      evaluateTransistor(
-        params,
-        { baseCurrentAmps: 0.001, supplyVoltageVolts: 12, collectorResistanceOhms: 0 },
+        { baseCurrentAmps: 0.005, collectorCurrentAmps: -0.01 },
         { health: NOMINAL_HEALTH }
       )
     ).toThrow(RangeError);

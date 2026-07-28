@@ -85,6 +85,15 @@ function glyphColor(
   if (component.type === "dht11") {
     return "#4C7A8A";
   }
+  if (component.type === "transistor" && result) {
+    const isOn = (result.visual as { isOn?: boolean }).isOn ?? false;
+    return isOn ? "#3FA6A6" : "#3B4C70";
+  }
+  if (component.type === "relay" && result) {
+    const isClosed = (result.visual as { contact: { visual: { isClosed: boolean } } })
+      .contact.visual.isClosed;
+    return isClosed ? "#3FA6A6" : "#3B4C70";
+  }
   return "#3B4C70";
 }
 

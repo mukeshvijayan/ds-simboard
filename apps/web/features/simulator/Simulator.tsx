@@ -77,6 +77,31 @@ function createComponent(
       health: segmentHealth,
     };
   }
+  if (preset.type === "transistor") {
+    const [baseLead, collectorLead, emitterLead] = points;
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      baseLead,
+      collectorLead,
+      emitterLead,
+      health,
+    };
+  }
+  if (preset.type === "relay") {
+    const [coilLeadA, coilLeadB, contactLeadA, contactLeadB] = points;
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      coilLeadA,
+      coilLeadB,
+      contactLeadA,
+      contactLeadB,
+      health: { coil: health, contact: health },
+    };
+  }
 
   const leads = points as [ConnectionPointRef, ConnectionPointRef];
   switch (preset.type) {

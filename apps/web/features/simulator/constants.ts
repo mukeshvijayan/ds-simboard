@@ -11,9 +11,11 @@ import type {
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
+  RelayParams,
   ResistorParams,
   SoilMoistureSensorParams,
   SoundSensorParams,
+  TransistorParams,
 } from "@ds-simboard/component-library";
 import type {
   BreadboardComponentType,
@@ -48,6 +50,8 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   dht11: "Temperature & Humidity Sensor (DHT11)",
   rgbLed: "RGB LED",
   sevenSegmentDisplay: "7-Segment Display",
+  transistor: "Transistor (NPN Switch)",
+  relay: "Relay Module",
 };
 
 /**
@@ -84,7 +88,9 @@ export type PartPreset =
       type: "sevenSegmentDisplay";
       label: string;
       params: SevenSegmentParams;
-    };
+    }
+  | { id: string; type: "transistor"; label: string; params: TransistorParams }
+  | { id: string; type: "relay"; label: string; params: RelayParams };
 
 /**
  * How many leads a preset needs, and what to call each one while placing
@@ -112,6 +118,12 @@ export function presetLeadNames(preset: PartPreset): string[] {
   }
   if (preset.type === "led" || preset.type === "diode") {
     return ["anode (+)", "cathode (−)"];
+  }
+  if (preset.type === "transistor") {
+    return ["base", "collector", "emitter"];
+  }
+  if (preset.type === "relay") {
+    return ["coil lead 1", "coil lead 2", "common contact", "normally-open contact"];
   }
   return ["first lead", "second lead"];
 }
@@ -378,6 +390,29 @@ export const PART_PRESETS: PartPreset[] = [
         maxCurrentAmps: 0.03,
         color: "red",
       },
+    },
+  },
+  {
+    id: "transistor-npn-switch",
+    type: "transistor",
+    label: "Transistor (NPN Switch)",
+    params: {
+      baseEmitterVoltageDropVolts: 0.7,
+      baseThresholdCurrentAmps: 0.001,
+      onResistanceOhms: 1,
+      maxCollectorCurrentAmps: 0.5,
+    },
+  },
+  {
+    id: "relay-module",
+    type: "relay",
+    label: "Relay Module",
+    params: {
+      coilResistanceOhms: 400,
+      pullInCurrentAmps: 0.01,
+      contactOnResistanceOhms: 0.05,
+      maxCoilCurrentAmps: 0.05,
+      maxContactCurrentAmps: 2,
     },
   },
 ];

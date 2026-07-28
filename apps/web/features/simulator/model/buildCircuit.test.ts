@@ -343,3 +343,99 @@ describe("buildCircuit — multi-lead components (P2-2)", () => {
     expect(result.graph.allElements).toHaveLength(9);
   });
 });
+
+describe("buildCircuit — transistor and relay two graph elements (P2-2 part 2, closing ADR 0022/0026)", () => {
+  const transistorParams = {
+    baseEmitterVoltageDropVolts: 0.7,
+    baseThresholdCurrentAmps: 0.001,
+    onResistanceOhms: 1,
+    maxCollectorCurrentAmps: 0.5,
+  };
+  const relayParams = {
+    coilResistanceOhms: 400,
+    pullInCurrentAmps: 0.01,
+    contactOnResistanceOhms: 0.05,
+    maxCoilCurrentAmps: 0.05,
+    maxContactCurrentAmps: 2,
+  };
+
+  it("gives the transistor's base-emitter and collector-emitter branches the shared emitter node", () => {
+    const bb = breadboard("bb1");
+    const component: PlacedComponent = {
+      id: "q1",
+      type: "transistor",
+      params: transistorParams,
+      baseLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 1 },
+      },
+      collectorLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 2 },
+      },
+      emitterLead: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "rail", rail: "top-negative" },
+      },
+      health: { status: "nominal" },
+    };
+    const result = buildCircuit([bb], [component], []);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+
+    const base = result.graph.getElement("q1:be");
+    const collector = result.graph.getElement("q1:ce");
+    expect(base).toBeDefined();
+    expect(collector).toBeDefined();
+    expect(base?.nodeB).toBe(collector?.nodeB); // shared emitter node
+    expect(base?.nodeA).not.toBe(collector?.nodeA); // base and collector are distinct
+    // 1 supply edge + base-emitter + collector-emitter
+    expect(result.graph.allElements).toHaveLength(3);
+  });
+
+  it("gives the relay's coil and contact branches no shared node", () => {
+    const bb = breadboard("bb1");
+    const component: PlacedComponent = {
+      id: "k1",
+      type: "relay",
+      params: relayParams,
+      coilLeadA: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 1 },
+      },
+      coilLeadB: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 2 },
+      },
+      contactLeadA: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 3 },
+      },
+      contactLeadB: {
+        kind: "breadboardHole",
+        boardItemId: "bb1",
+        hole: { kind: "strip", row: "a", column: 4 },
+      },
+      health: { coil: { status: "nominal" }, contact: { status: "nominal" } },
+    };
+    const result = buildCircuit([bb], [component], []);
+    expect(result.status).toBe("built");
+    if (result.status !== "built") return;
+
+    const coil = result.graph.getElement("k1:coil");
+    const contact = result.graph.getElement("k1:contact");
+    expect(coil).toBeDefined();
+    expect(contact).toBeDefined();
+    const coilNodes = new Set([coil?.nodeA, coil?.nodeB]);
+    const contactNodes = new Set([contact?.nodeA, contact?.nodeB]);
+    expect([...contactNodes].some((n) => coilNodes.has(n))).toBe(false);
+    // 1 supply edge + coil + contact
+    expect(result.graph.allElements).toHaveLength(3);
+  });
+});

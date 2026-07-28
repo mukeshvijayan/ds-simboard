@@ -7,34 +7,34 @@ import {
 } from "../../contract/types";
 
 export interface TransistorParams {
-  polarity: "NPN" | "PNP";
-  /** Current gain (β). */
-  hFE: number;
-  /** Saturation voltage between collector and emitter. */
-  vceSatVolts: number;
+  /** Typical Si BJT base-emitter drop, ~0.7V. */
+  baseEmitterVoltageDropVolts: number;
+  /** Minimum base current that saturates the switch fully on. */
+  baseThresholdCurrentAmps: number;
+  /** Collector-emitter resistance once saturated — small, e.g. 1-10Ω. */
+  onResistanceOhms: number;
   maxCollectorCurrentAmps: number;
 }
 
 export interface TransistorInput {
   baseCurrentAmps: number;
-  supplyVoltageVolts: number;
-  collectorResistanceOhms: number;
+  collectorCurrentAmps: number;
 }
 
 export interface TransistorVisual extends VisualState {
+  isOn: boolean;
   collectorCurrentAmps: number;
-  isConducting: boolean;
-  /** True when the base is asking for more current than the collector
-   * circuit can supply — the textbook "transistor as a switch" region. */
-  isSaturated: boolean;
 }
 
 function validateParams(params: TransistorParams): void {
-  if (!(params.hFE > 0)) {
-    throw new RangeError("hFE must be > 0");
+  if (!(params.baseEmitterVoltageDropVolts >= 0)) {
+    throw new RangeError("baseEmitterVoltageDropVolts must be >= 0");
   }
-  if (!(params.vceSatVolts >= 0)) {
-    throw new RangeError("vceSatVolts must be >= 0");
+  if (!(params.baseThresholdCurrentAmps > 0)) {
+    throw new RangeError("baseThresholdCurrentAmps must be > 0");
+  }
+  if (!(params.onResistanceOhms > 0)) {
+    throw new RangeError("onResistanceOhms must be > 0");
   }
   if (!(params.maxCollectorCurrentAmps > 0)) {
     throw new RangeError("maxCollectorCurrentAmps must be > 0");
@@ -45,28 +45,32 @@ function validateInput(input: TransistorInput): void {
   if (!(input.baseCurrentAmps >= 0)) {
     throw new RangeError("baseCurrentAmps must be >= 0");
   }
-  if (!(input.supplyVoltageVolts >= 0)) {
-    throw new RangeError("supplyVoltageVolts must be >= 0");
-  }
-  if (!(input.collectorResistanceOhms > 0)) {
-    throw new RangeError("collectorResistanceOhms must be > 0");
+  if (!(input.collectorCurrentAmps >= 0)) {
+    throw new RangeError("collectorCurrentAmps must be >= 0");
   }
 }
 
 /**
- * Models a BJT as a current-controlled switch/amplifier (spec Part 2.2):
- * the collector current is whichever is smaller of (a) the amplified base
- * current (`hFE × Ib`, the "amplifier region" answer) and (b) whatever the
- * external collector circuit can actually supply once the transistor is
- * fully on (`(Vsupply − VceSat) / Rc`, the "saturation region" ceiling) —
- * this is the standard textbook analysis for a transistor switch.
- *
- * This is a 3-terminal device (base, collector, emitter). `circuit-engine`'s
- * `CircuitGraph`/series-loop solver only models 2-terminal elements, so
- * this component's inputs are given directly rather than derived by
- * walking a graph — how a 3-terminal device fits the graph model at all is
- * an open question for whichever later phase needs to wire a transistor
- * into a user-built circuit, not decided here.
+ * Whether enough base current is flowing to saturate the switch fully
+ * on — the decision the graph-building layer needs *before* it knows
+ * what resistance to give the collector-emitter branch for its second,
+ * final solve. See docs/architecture/0026-*.md's two-phase resolve.
+ */
+export function transistorIsOn(
+  params: TransistorParams,
+  baseCurrentAmps: number
+): boolean {
+  return baseCurrentAmps >= params.baseThresholdCurrentAmps;
+}
+
+/**
+ * A BJT modeled purely as a current-controlled switch (spec Part 2.2,
+ * "transistor as a switch" — not the amplifier/linear region): base
+ * current above `baseThresholdCurrentAmps` saturates it into a small
+ * `onResistanceOhms` collector-emitter path; below it, that path is open.
+ * `collectorCurrentAmps` is never derived here — it's whatever the
+ * general MNA solver actually found once the graph is re-solved with
+ * that decision baked in, never a scripted stand-in.
  */
 export function evaluateTransistor(
   params: TransistorParams,
@@ -76,27 +80,21 @@ export function evaluateTransistor(
   validateParams(params);
   validateInput(input);
 
-  const idealCurrentAmps = params.hFE * input.baseCurrentAmps;
-  const saturationCurrentAmps = Math.max(
-    0,
-    (input.supplyVoltageVolts - params.vceSatVolts) / input.collectorResistanceOhms
-  );
-  const collectorCurrentAmps = Math.min(idealCurrentAmps, saturationCurrentAmps);
-  const isSaturated = idealCurrentAmps > saturationCurrentAmps;
-
   const health = applyMagnitudeThresholdHealth({
     previousHealth: previous.health,
-    measuredValue: collectorCurrentAmps,
+    measuredValue: input.collectorCurrentAmps,
     maxValue: params.maxCollectorCurrentAmps,
-    failureReason: `collector current ${(collectorCurrentAmps * 1000).toFixed(1)}mA exceeds max rating ${(params.maxCollectorCurrentAmps * 1000).toFixed(1)}mA`,
+    failureReason: `collector current ${(input.collectorCurrentAmps * 1000).toFixed(1)}mA exceeds max rating ${(params.maxCollectorCurrentAmps * 1000).toFixed(1)}mA`,
   });
+
+  const isOn =
+    health.status === "failed" ? false : transistorIsOn(params, input.baseCurrentAmps);
 
   return {
     visual: {
       health,
-      collectorCurrentAmps,
-      isConducting: collectorCurrentAmps > 0,
-      isSaturated,
+      isOn,
+      collectorCurrentAmps: health.status === "failed" ? 0 : input.collectorCurrentAmps,
     },
     health,
   };

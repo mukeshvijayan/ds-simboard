@@ -11,9 +11,11 @@ import type {
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
+  RelayParams,
   ResistorParams,
   SoilMoistureSensorParams,
   SoundSensorParams,
+  TransistorParams,
 } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "./connectionPoint";
 
@@ -42,7 +44,9 @@ export type BreadboardComponentType =
   | "soundSensor"
   | "dht11"
   | "rgbLed"
-  | "sevenSegmentDisplay";
+  | "sevenSegmentDisplay"
+  | "transistor"
+  | "relay";
 
 interface BaseComponent {
   id: string;
@@ -198,6 +202,40 @@ export interface PlacedSevenSegmentDisplay {
   health: Record<SevenSegmentName, HealthState>;
 }
 
+/**
+ * Transistor-as-switch and relay module (P2-2 part 2, closing ADR 0022)
+ * both need a two-phase resolve — one branch's on/off state depends on a
+ * *different* branch's real solved current, not its own. See
+ * docs/architecture/0026-*.md. A transistor is 3 leads (base, collector,
+ * emitter) → 2 graph elements sharing the emitter node; a relay is 4
+ * leads (2 coil, 2 contact) → 2 graph elements that do *not* share a
+ * node with each other.
+ */
+export interface PlacedTransistor {
+  id: string;
+  type: "transistor";
+  params: TransistorParams;
+  baseLead: ConnectionPointRef;
+  collectorLead: ConnectionPointRef;
+  emitterLead: ConnectionPointRef;
+  health: HealthState;
+}
+
+export interface PlacedRelay {
+  id: string;
+  type: "relay";
+  params: RelayParams;
+  coilLeadA: ConnectionPointRef;
+  coilLeadB: ConnectionPointRef;
+  /** Common/pole terminal. */
+  contactLeadA: ConnectionPointRef;
+  /** Normally-open terminal. */
+  contactLeadB: ConnectionPointRef;
+  /** A burned coil doesn't weld the contacts, and vice versa — same
+   * per-channel reasoning as `PlacedRgbLed.health`. */
+  health: { coil: HealthState; contact: HealthState };
+}
+
 export type PlacedComponent =
   | PlacedResistor
   | PlacedLed
@@ -214,7 +252,9 @@ export type PlacedComponent =
   | PlacedSoundSensor
   | PlacedDht11
   | PlacedRgbLed
-  | PlacedSevenSegmentDisplay;
+  | PlacedSevenSegmentDisplay
+  | PlacedTransistor
+  | PlacedRelay;
 
 /** A user-drawn wire directly connecting any two connection points. */
 export interface CanvasWireModel {

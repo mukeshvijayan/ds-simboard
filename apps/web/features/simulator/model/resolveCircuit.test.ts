@@ -343,3 +343,213 @@ describe("resolveCircuit — a resistive sensor placed directly on the rails", (
     expect(result.supplyCurrentAmps).toBeGreaterThan(0);
   });
 });
+
+describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 2, closing ADR 0022/0026)", () => {
+  const transistorParams = {
+    baseEmitterVoltageDropVolts: 0.7,
+    baseThresholdCurrentAmps: 0.0005,
+    onResistanceOhms: 1,
+    maxCollectorCurrentAmps: 0.5,
+  };
+
+  it("saturates on and lights the collector-side LED when base current clears the threshold", () => {
+    // Base current = (5 - 0.7) / 4700 ~= 0.915mA, above the 0.5mA threshold.
+    const components: PlacedComponent[] = [
+      {
+        id: "rb",
+        type: "resistor",
+        params: { resistanceOhms: 4700, ratedPowerWatts: 0.25 },
+        leads: [positiveRail(), strip("a", 1)],
+        health: { status: "nominal" },
+      },
+      {
+        id: "q1",
+        type: "transistor",
+        params: transistorParams,
+        baseLead: strip("a", 1),
+        collectorLead: strip("a", 2),
+        emitterLead: negativeRail(),
+        health: { status: "nominal" },
+      },
+      resistor("rc", [positiveRail(), strip("a", 3)]),
+      led("led1", [strip("a", 3), strip("a", 2)], true),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const transistorResult = result.componentResults.get("q1");
+    const visual = transistorResult?.visual as {
+      isOn: boolean;
+      collectorCurrentAmps: number;
+    };
+    expect(visual.isOn).toBe(true);
+    expect(visual.collectorCurrentAmps).toBeGreaterThan(0);
+
+    const ledResult = result.componentResults.get("led1");
+    expect((ledResult?.visual as { brightness: number }).brightness).toBeGreaterThan(0);
+  });
+
+  it("stays off, and the collector-side LED stays dark, when base current is below the threshold", () => {
+    const components: PlacedComponent[] = [
+      // Same 4700Ω base resistor (~0.915mA), but now below a deliberately
+      // high 10mA threshold — the switch shouldn't saturate.
+      {
+        id: "rb",
+        type: "resistor",
+        params: { resistanceOhms: 4700, ratedPowerWatts: 0.25 },
+        leads: [positiveRail(), strip("a", 1)],
+        health: { status: "nominal" },
+      },
+      {
+        id: "q1",
+        type: "transistor",
+        params: { ...transistorParams, baseThresholdCurrentAmps: 0.01 },
+        baseLead: strip("a", 1),
+        collectorLead: strip("a", 2),
+        emitterLead: negativeRail(),
+        health: { status: "nominal" },
+      },
+      resistor("rc", [positiveRail(), strip("a", 3)]),
+      led("led1", [strip("a", 3), strip("a", 2)], true),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const transistorResult = result.componentResults.get("q1");
+    expect((transistorResult?.visual as { isOn: boolean }).isOn).toBe(false);
+    expect(
+      (transistorResult?.visual as { collectorCurrentAmps: number }).collectorCurrentAmps
+    ).toBe(0);
+
+    const ledResult = result.componentResults.get("led1");
+    expect((ledResult?.visual as { brightness: number }).brightness).toBe(0);
+  });
+
+  it("fails the transistor once collector current exceeds its rating, without harming the LED", () => {
+    const components: PlacedComponent[] = [
+      resistor("rb", [positiveRail(), strip("a", 1)]),
+      {
+        id: "q1",
+        type: "transistor",
+        params: { ...transistorParams, maxCollectorCurrentAmps: 0.001 },
+        baseLead: strip("a", 1),
+        collectorLead: strip("a", 2),
+        emitterLead: negativeRail(),
+        health: { status: "nominal" },
+      },
+      resistor("rc", [positiveRail(), strip("a", 3)]),
+      led("led1", [strip("a", 3), strip("a", 2)], true),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const transistorResult = result.componentResults.get("q1");
+    expect(transistorResult?.health).toEqual({
+      status: "failed",
+      reason: expect.stringContaining("collector current"),
+    });
+  });
+});
+
+describe("resolveCircuit — relay module, two-phase resolve (P2-2 part 2, closing ADR 0022/0026)", () => {
+  const relayParams = {
+    coilResistanceOhms: 400,
+    pullInCurrentAmps: 0.01,
+    contactOnResistanceOhms: 0.05,
+    maxCoilCurrentAmps: 0.05,
+    maxContactCurrentAmps: 2,
+  };
+
+  it("energizes and closes the contact, lighting an independent load circuit", () => {
+    // Coil current = 5 / 400 = 12.5mA, above the 10mA pull-in threshold.
+    const components: PlacedComponent[] = [
+      {
+        id: "k1",
+        type: "relay",
+        params: relayParams,
+        coilLeadA: positiveRail(),
+        coilLeadB: negativeRail(),
+        contactLeadA: positiveRail(),
+        contactLeadB: strip("a", 1),
+        health: { coil: { status: "nominal" }, contact: { status: "nominal" } },
+      },
+      resistor("rload", [strip("a", 1), negativeRail()]),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const relayResult = result.componentResults.get("k1");
+    const visual = relayResult?.visual as {
+      coil: { visual: { isEnergized: boolean } };
+      contact: { visual: { isClosed: boolean; currentAmps: number } };
+    };
+    expect(visual.coil.visual.isEnergized).toBe(true);
+    expect(visual.contact.visual.isClosed).toBe(true);
+    expect(visual.contact.visual.currentAmps).toBeGreaterThan(0);
+  });
+
+  it("stays de-energized and open when coil current is below the pull-in threshold", () => {
+    const components: PlacedComponent[] = [
+      {
+        id: "k1",
+        type: "relay",
+        params: { ...relayParams, pullInCurrentAmps: 1, maxCoilCurrentAmps: 2 },
+        coilLeadA: positiveRail(),
+        coilLeadB: negativeRail(),
+        contactLeadA: positiveRail(),
+        contactLeadB: strip("a", 1),
+        health: { coil: { status: "nominal" }, contact: { status: "nominal" } },
+      },
+      resistor("rload", [strip("a", 1), negativeRail()]),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const relayResult = result.componentResults.get("k1");
+    const visual = relayResult?.visual as {
+      coil: { visual: { isEnergized: boolean } };
+      contact: { visual: { isClosed: boolean; currentAmps: number } };
+    };
+    expect(visual.coil.visual.isEnergized).toBe(false);
+    expect(visual.contact.visual.isClosed).toBe(false);
+    expect(visual.contact.visual.currentAmps).toBe(0);
+  });
+
+  it("fails only the coil, not the contact, on coil over-current", () => {
+    const components: PlacedComponent[] = [
+      {
+        id: "k1",
+        type: "relay",
+        params: { ...relayParams, pullInCurrentAmps: 0.0005, maxCoilCurrentAmps: 0.001 },
+        coilLeadA: positiveRail(),
+        coilLeadB: negativeRail(),
+        contactLeadA: positiveRail(),
+        contactLeadB: strip("a", 1),
+        health: { coil: { status: "nominal" }, contact: { status: "nominal" } },
+      },
+      resistor("rload", [strip("a", 1), negativeRail()]),
+    ];
+
+    const result = resolveCircuit([breadboard()], components, [], 5);
+    expect(result.status).toBe("solved");
+    if (result.status !== "solved") return;
+
+    const relayResult = result.componentResults.get("k1");
+    const health = relayResult?.health as {
+      coil: { status: string };
+      contact: { status: string };
+    };
+    expect(health.coil.status).toBe("failed");
+    expect(health.contact.status).toBe("nominal");
+  });
+});

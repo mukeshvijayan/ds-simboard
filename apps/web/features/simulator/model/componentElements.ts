@@ -50,6 +50,36 @@ export function componentGraphElements(
     });
   }
 
+  if (component.type === "transistor") {
+    return [
+      {
+        elementId: `${component.id}:be`,
+        nodeA: component.baseLead,
+        nodeB: component.emitterLead,
+      },
+      {
+        elementId: `${component.id}:ce`,
+        nodeA: component.collectorLead,
+        nodeB: component.emitterLead,
+      },
+    ];
+  }
+
+  if (component.type === "relay") {
+    return [
+      {
+        elementId: `${component.id}:coil`,
+        nodeA: component.coilLeadA,
+        nodeB: component.coilLeadB,
+      },
+      {
+        elementId: `${component.id}:contact`,
+        nodeA: component.contactLeadA,
+        nodeB: component.contactLeadB,
+      },
+    ];
+  }
+
   const swapLeads =
     (component.type === "led" || component.type === "diode") &&
     !component.leadZeroIsPositive;
@@ -77,6 +107,17 @@ export function componentLeadPoints(component: PlacedComponent): ConnectionPoint
     return [
       component.commonLead,
       ...SEVEN_SEGMENT_NAMES.map((name) => component.segmentLeads[name]),
+    ];
+  }
+  if (component.type === "transistor") {
+    return [component.baseLead, component.collectorLead, component.emitterLead];
+  }
+  if (component.type === "relay") {
+    return [
+      component.coilLeadA,
+      component.coilLeadB,
+      component.contactLeadA,
+      component.contactLeadB,
     ];
   }
   return [component.leads[0], component.leads[1]];
