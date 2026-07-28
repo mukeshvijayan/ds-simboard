@@ -16,6 +16,7 @@ describe("golden path: LED + resistor + battery", () => {
     forwardVoltageVolts: 2,
     ratedCurrentAmps: 0.02,
     maxCurrentAmps: 0.03,
+    color: "red" as const,
   };
   const supplyVoltage = 5;
 

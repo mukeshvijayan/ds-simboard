@@ -5,17 +5,29 @@ import {
 } from "@ds-simboard/circuit-engine";
 import {
   applyShortCircuitHealth,
+  batteryHolderSeriesElement,
+  buzzerSeriesElement,
+  dcMotorSeriesElement,
   diodeSeriesElement,
+  evaluateBatteryHolder,
+  evaluateBuzzer,
+  evaluateDcMotor,
   evaluateDiode,
+  evaluateLdr,
   evaluateLed,
   evaluatePotentiometer,
   evaluatePushbutton,
   evaluateResistor,
   ledSeriesElement,
+  ldrSeriesElement,
   potentiometerSeriesElement,
   pushbuttonSeriesElement,
   resistorSeriesElement,
+  type BatteryHolderVisual,
+  type BuzzerVisual,
+  type DcMotorVisual,
   type DiodeVisual,
+  type LdrVisual,
   type LedVisual,
   type HealthState,
   type PotentiometerVisual,
@@ -27,7 +39,15 @@ import { physicalEntryNode, resolveBias } from "./bias";
 import type { PlacedComponent, Wire } from "./types";
 
 export type ComponentVisual =
-  ResistorVisual | LedVisual | DiodeVisual | PushbuttonVisual | PotentiometerVisual;
+  | ResistorVisual
+  | LedVisual
+  | DiodeVisual
+  | PushbuttonVisual
+  | PotentiometerVisual
+  | BuzzerVisual
+  | DcMotorVisual
+  | LdrVisual
+  | BatteryHolderVisual;
 
 export interface ComponentResult {
   health: HealthState;
@@ -51,13 +71,23 @@ export type ResolveCircuitResult =
 
 type NonPolarizedComponent = Extract<
   PlacedComponent,
-  { type: "resistor" | "potentiometer" | "pushbutton" }
+  {
+    type:
+      | "resistor"
+      | "potentiometer"
+      | "pushbutton"
+      | "buzzer"
+      | "dcMotor"
+      | "ldr"
+      | "batteryHolder";
+  }
 >;
 type PolarizedComponent = Extract<PlacedComponent, { type: "led" | "diode" }>;
 
 function evaluateComponent(
   component: NonPolarizedComponent,
-  currentAmps: number
+  currentAmps: number,
+  supplyVoltageVolts: number
 ): ComponentResult {
   switch (component.type) {
     case "resistor": {
@@ -80,6 +110,38 @@ function evaluateComponent(
       const result = evaluatePushbutton(
         component.params,
         { pressed: component.pressed },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "buzzer": {
+      const result = evaluateBuzzer(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "dcMotor": {
+      const result = evaluateDcMotor(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "ldr": {
+      const result = evaluateLdr(
+        component.params,
+        { lightLevel: component.lightLevel },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "batteryHolder": {
+      const result = evaluateBatteryHolder(
+        component.params,
+        { supplyVoltageVolts },
         { health: component.health }
       );
       return { health: result.health, visual: result.visual };
@@ -182,6 +244,14 @@ export function resolveCircuit(
         return potentiometerSeriesElement(component.params, component.wiperPosition);
       case "pushbutton":
         return pushbuttonSeriesElement(component.pressed);
+      case "buzzer":
+        return buzzerSeriesElement(component.params, component.health);
+      case "dcMotor":
+        return dcMotorSeriesElement(component.params, component.health);
+      case "ldr":
+        return ldrSeriesElement(component.params, component.lightLevel);
+      case "batteryHolder":
+        return batteryHolderSeriesElement();
       case "led":
         return ledSeriesElement(
           component.params,
@@ -217,7 +287,7 @@ export function resolveCircuit(
               biasByComponentId.get(failedComponent.id) ?? "forward",
               0
             )
-          : evaluateComponent(failedComponent, 0);
+          : evaluateComponent(failedComponent, 0, supplyVoltageVolts);
       componentResults.set(component.id, result);
     }
     return { status: "short-circuit", componentResults };
@@ -237,7 +307,10 @@ export function resolveCircuit(
         evaluatePolarizedComponent(component, bias, magnitude)
       );
     } else {
-      componentResults.set(component.id, evaluateComponent(component, currentAmps));
+      componentResults.set(
+        component.id,
+        evaluateComponent(component, currentAmps, supplyVoltageVolts)
+      );
     }
   }
 

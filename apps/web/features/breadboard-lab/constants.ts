@@ -1,4 +1,15 @@
 import { NOMINAL_HEALTH } from "@ds-simboard/component-library";
+import type {
+  BatteryHolderParams,
+  BuzzerParams,
+  DcMotorParams,
+  DiodeParams,
+  LdrParams,
+  LedParams,
+  PotentiometerParams,
+  PushbuttonParams,
+  ResistorParams,
+} from "@ds-simboard/component-library";
 import type { BreadboardComponentType } from "./model/types";
 
 /** Kept small deliberately — enough columns for a handful of real
@@ -7,20 +18,195 @@ export const BREADBOARD_COLUMNS = 20;
 
 export const DEFAULT_SUPPLY_VOLTAGE = 5;
 
+/** Generic, type-level label — used for aria-labels on already-placed
+ * components and Inspector headers. See `PART_PRESETS` for the
+ * palette-specific labels (e.g. "LED (Red)"), since several presets can
+ * share one underlying type. */
 export const PART_LABELS: Record<BreadboardComponentType, string> = {
   resistor: "Resistor",
   led: "LED",
   diode: "Diode",
   pushbutton: "Pushbutton",
   potentiometer: "Potentiometer",
+  buzzer: "Buzzer",
+  dcMotor: "DC Motor",
+  ldr: "Light Sensor (LDR)",
+  batteryHolder: "Battery Holder",
 };
 
-export const DEFAULT_PARAMS = {
-  resistor: { resistanceOhms: 220, ratedPowerWatts: 0.25 },
-  led: { forwardVoltageVolts: 2, ratedCurrentAmps: 0.02, maxCurrentAmps: 0.03 },
-  diode: { forwardVoltageVolts: 0.7, reverseBreakdownVoltageVolts: 1000 },
-  pushbutton: { isMomentary: true },
-  potentiometer: { totalResistanceOhms: 10_000, ratedPowerWatts: 0.2 },
-} as const;
+/**
+ * One entry per palette button. Several presets share an underlying
+ * `BreadboardComponentType` with `component-library`'s own electrical
+ * model (e.g. every LED color is the same `evaluateLed`, just a
+ * different `forwardVoltageVolts`/`color`) — see docs/architecture/
+ * 0006-*.md and the `BreadboardComponentType` doc comment in
+ * `model/types.ts` for why that's not a new type per preset.
+ */
+export type PartPreset =
+  | { id: string; type: "resistor"; label: string; params: ResistorParams }
+  | { id: string; type: "led"; label: string; params: LedParams }
+  | { id: string; type: "diode"; label: string; params: DiodeParams }
+  | { id: string; type: "pushbutton"; label: string; params: PushbuttonParams }
+  | { id: string; type: "potentiometer"; label: string; params: PotentiometerParams }
+  | { id: string; type: "buzzer"; label: string; params: BuzzerParams }
+  | { id: string; type: "dcMotor"; label: string; params: DcMotorParams }
+  | { id: string; type: "ldr"; label: string; params: LdrParams }
+  | { id: string; type: "batteryHolder"; label: string; params: BatteryHolderParams };
+
+/** Real-world typical forward voltages per spec Part 2.2. */
+const LED_PRESETS: PartPreset[] = [
+  {
+    id: "led-red",
+    type: "led",
+    label: "LED (Red)",
+    params: {
+      forwardVoltageVolts: 2.0,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "red",
+    },
+  },
+  {
+    id: "led-green",
+    type: "led",
+    label: "LED (Green)",
+    params: {
+      forwardVoltageVolts: 2.1,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "green",
+    },
+  },
+  {
+    id: "led-blue",
+    type: "led",
+    label: "LED (Blue)",
+    params: {
+      forwardVoltageVolts: 3.2,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "blue",
+    },
+  },
+  {
+    id: "led-yellow",
+    type: "led",
+    label: "LED (Yellow)",
+    params: {
+      forwardVoltageVolts: 2.1,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "yellow",
+    },
+  },
+  {
+    id: "led-white",
+    type: "led",
+    label: "LED (White)",
+    params: {
+      forwardVoltageVolts: 3.2,
+      ratedCurrentAmps: 0.02,
+      maxCurrentAmps: 0.03,
+      color: "white",
+    },
+  },
+];
+
+/** Common, real resistor color-band values a student would actually have on hand. */
+const RESISTOR_PRESETS: PartPreset[] = [
+  {
+    id: "resistor-220",
+    type: "resistor",
+    label: "Resistor (220Ω)",
+    params: { resistanceOhms: 220, ratedPowerWatts: 0.25 },
+  },
+  {
+    id: "resistor-330",
+    type: "resistor",
+    label: "Resistor (330Ω)",
+    params: { resistanceOhms: 330, ratedPowerWatts: 0.25 },
+  },
+  {
+    id: "resistor-1k",
+    type: "resistor",
+    label: "Resistor (1kΩ)",
+    params: { resistanceOhms: 1_000, ratedPowerWatts: 0.25 },
+  },
+  {
+    id: "resistor-10k",
+    type: "resistor",
+    label: "Resistor (10kΩ)",
+    params: { resistanceOhms: 10_000, ratedPowerWatts: 0.25 },
+  },
+];
+
+export const PART_PRESETS: PartPreset[] = [
+  ...RESISTOR_PRESETS,
+  ...LED_PRESETS,
+  {
+    id: "diode",
+    type: "diode",
+    label: "Diode",
+    params: { forwardVoltageVolts: 0.7, reverseBreakdownVoltageVolts: 1000 },
+  },
+  {
+    id: "pushbutton",
+    type: "pushbutton",
+    label: "Pushbutton",
+    params: { isMomentary: true },
+  },
+  {
+    id: "toggle-switch",
+    type: "pushbutton",
+    label: "Toggle Switch",
+    params: { isMomentary: false },
+  },
+  {
+    id: "potentiometer",
+    type: "potentiometer",
+    label: "Potentiometer",
+    params: { totalResistanceOhms: 10_000, ratedPowerWatts: 0.2 },
+  },
+  {
+    id: "buzzer-active",
+    type: "buzzer",
+    label: "Buzzer (Active)",
+    params: {
+      kind: "active",
+      ratedVoltageVolts: 5,
+      ratedCurrentAmps: 0.03,
+      maxCurrentAmps: 0.05,
+    },
+  },
+  {
+    id: "buzzer-passive",
+    type: "buzzer",
+    label: "Buzzer (Passive)",
+    params: {
+      kind: "passive",
+      ratedVoltageVolts: 5,
+      ratedCurrentAmps: 0.03,
+      maxCurrentAmps: 0.05,
+    },
+  },
+  {
+    id: "dc-motor",
+    type: "dcMotor",
+    label: "DC Motor",
+    params: { ratedVoltageVolts: 6, ratedCurrentAmps: 0.1, stallCurrentAmps: 0.4 },
+  },
+  {
+    id: "ldr",
+    type: "ldr",
+    label: "Light Sensor (LDR)",
+    params: { minResistanceOhms: 500, maxResistanceOhms: 1_000_000 },
+  },
+  {
+    id: "battery-holder",
+    type: "batteryHolder",
+    label: "Battery Holder",
+    params: {},
+  },
+];
 
 export { NOMINAL_HEALTH };

@@ -52,7 +52,44 @@ export { evaluateDiode, diodeSeriesElement, diodeModel } from "./components/diod
 export type { DiodeParams, DiodeInput, DiodeVisual } from "./components/diode/diode";
 
 export { evaluateLed, ledSeriesElement, ledModel } from "./components/led/led";
-export type { LedParams, LedInput, LedVisual } from "./components/led/led";
+export type { LedParams, LedInput, LedVisual, LedColor } from "./components/led/led";
+
+export {
+  evaluateBuzzer,
+  buzzerSeriesElement,
+  buzzerModel,
+} from "./components/buzzer/buzzer";
+export type { BuzzerParams, BuzzerInput, BuzzerVisual } from "./components/buzzer/buzzer";
+
+export {
+  evaluateDcMotor,
+  dcMotorSeriesElement,
+  dcMotorModel,
+} from "./components/dcMotor/dcMotor";
+export type {
+  DcMotorParams,
+  DcMotorInput,
+  DcMotorVisual,
+} from "./components/dcMotor/dcMotor";
+
+export {
+  evaluateLdr,
+  ldrSeriesElement,
+  effectiveLdrResistance,
+  ldrModel,
+} from "./components/ldr/ldr";
+export type { LdrParams, LdrInput, LdrVisual } from "./components/ldr/ldr";
+
+export {
+  evaluateBatteryHolder,
+  batteryHolderSeriesElement,
+  batteryHolderModel,
+} from "./components/batteryHolder/batteryHolder";
+export type {
+  BatteryHolderParams,
+  BatteryHolderInput,
+  BatteryHolderVisual,
+} from "./components/batteryHolder/batteryHolder";
 
 export { evaluateCapacitor, capacitorModel } from "./components/capacitor/capacitor";
 export type {

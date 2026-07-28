@@ -1,7 +1,12 @@
 import { NOMINAL_HEALTH } from "../../contract/types";
 import { evaluateLed, ledSeriesElement } from "./led";
 
-const params = { forwardVoltageVolts: 2, ratedCurrentAmps: 0.02, maxCurrentAmps: 0.03 };
+const params = {
+  forwardVoltageVolts: 2,
+  ratedCurrentAmps: 0.02,
+  maxCurrentAmps: 0.03,
+  color: "red" as const,
+};
 
 describe("evaluateLed — forward biased, healthy operation", () => {
   it("is fully bright at the rated current", () => {
@@ -99,7 +104,12 @@ describe("evaluateLed — validation", () => {
   it("throws for a negative forward voltage", () => {
     expect(() =>
       evaluateLed(
-        { forwardVoltageVolts: -1, ratedCurrentAmps: 0.02, maxCurrentAmps: 0.03 },
+        {
+          forwardVoltageVolts: -1,
+          ratedCurrentAmps: 0.02,
+          maxCurrentAmps: 0.03,
+          color: "red",
+        },
         { biased: "forward", currentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
@@ -109,7 +119,12 @@ describe("evaluateLed — validation", () => {
   it("throws for a non-positive rated current", () => {
     expect(() =>
       evaluateLed(
-        { forwardVoltageVolts: 2, ratedCurrentAmps: 0, maxCurrentAmps: 0.03 },
+        {
+          forwardVoltageVolts: 2,
+          ratedCurrentAmps: 0,
+          maxCurrentAmps: 0.03,
+          color: "red",
+        },
         { biased: "forward", currentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )
@@ -119,7 +134,12 @@ describe("evaluateLed — validation", () => {
   it("throws when maxCurrentAmps is below ratedCurrentAmps", () => {
     expect(() =>
       evaluateLed(
-        { forwardVoltageVolts: 2, ratedCurrentAmps: 0.03, maxCurrentAmps: 0.02 },
+        {
+          forwardVoltageVolts: 2,
+          ratedCurrentAmps: 0.03,
+          maxCurrentAmps: 0.02,
+          color: "red",
+        },
         { biased: "forward", currentAmps: 0.01 },
         { health: NOMINAL_HEALTH }
       )

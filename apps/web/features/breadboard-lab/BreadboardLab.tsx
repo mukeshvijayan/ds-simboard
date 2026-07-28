@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { HoleAddress } from "@ds-simboard/circuit-engine";
 import {
   BREADBOARD_COLUMNS,
-  DEFAULT_PARAMS,
   DEFAULT_SUPPLY_VOLTAGE,
   NOMINAL_HEALTH,
+  PART_PRESETS,
 } from "./constants";
 import { DesktopOnlyNotice } from "@/components/shared/DesktopOnlyNotice";
 import { BreadboardGrid } from "./components/BreadboardGrid";
@@ -15,25 +15,29 @@ import { Inspector } from "./components/Inspector";
 import { StatusBanner } from "./components/StatusBanner";
 import type { InteractionMode } from "./model/interactionMode";
 import { resolveCircuit } from "./model/resolveCircuit";
-import type { BreadboardComponentType, PlacedComponent, Wire } from "./model/types";
+import type { PlacedComponent, Wire } from "./model/types";
 import type { UIHoleRef } from "./model/layout";
 
 let nextId = 1;
 
 function createComponent(
-  type: BreadboardComponentType,
+  presetId: string,
   leads: [HoleAddress, HoleAddress]
 ): PlacedComponent {
-  const id = `${type}-${nextId++}`;
+  const preset = PART_PRESETS.find((p) => p.id === presetId);
+  if (!preset) {
+    throw new RangeError(`no palette preset with id "${presetId}"`);
+  }
+  const id = `${preset.type}-${nextId++}`;
   const health = NOMINAL_HEALTH;
-  switch (type) {
+  switch (preset.type) {
     case "resistor":
-      return { id, type, params: DEFAULT_PARAMS.resistor, leads, health };
+      return { id, type: preset.type, params: preset.params, leads, health };
     case "led":
       return {
         id,
-        type,
-        params: DEFAULT_PARAMS.led,
+        type: preset.type,
+        params: preset.params,
         leads,
         leadZeroIsPositive: true,
         health,
@@ -41,8 +45,8 @@ function createComponent(
     case "diode":
       return {
         id,
-        type,
-        params: DEFAULT_PARAMS.diode,
+        type: preset.type,
+        params: preset.params,
         leads,
         leadZeroIsPositive: true,
         health,
@@ -50,8 +54,8 @@ function createComponent(
     case "pushbutton":
       return {
         id,
-        type,
-        params: DEFAULT_PARAMS.pushbutton,
+        type: preset.type,
+        params: preset.params,
         leads,
         pressed: false,
         health,
@@ -59,12 +63,27 @@ function createComponent(
     case "potentiometer":
       return {
         id,
-        type,
-        params: DEFAULT_PARAMS.potentiometer,
+        type: preset.type,
+        params: preset.params,
         leads,
         wiperPosition: 0.5,
         health,
       };
+    case "buzzer":
+      return { id, type: preset.type, params: preset.params, leads, health };
+    case "dcMotor":
+      return { id, type: preset.type, params: preset.params, leads, health };
+    case "ldr":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        leads,
+        lightLevel: 0.5,
+        health,
+      };
+    case "batteryHolder":
+      return { id, type: preset.type, params: preset.params, leads, health };
   }
 }
 
@@ -111,7 +130,7 @@ export function BreadboardLab() {
       }
       setComponents((prev) => [
         ...prev,
-        createComponent(mode.type, [mode.firstHole as HoleAddress, hole.address]),
+        createComponent(mode.presetId, [mode.firstHole as HoleAddress, hole.address]),
       ]);
       setMode({ kind: "idle" });
       return;
@@ -146,6 +165,12 @@ export function BreadboardLab() {
       prev.map((c) =>
         c.id === id && c.type === "potentiometer" ? { ...c, wiperPosition } : c
       )
+    );
+  }
+
+  function handleLightLevelChange(id: string, lightLevel: number) {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === id && c.type === "ldr" ? { ...c, lightLevel } : c))
     );
   }
 
@@ -199,7 +224,7 @@ export function BreadboardLab() {
         <div className="flex flex-1 overflow-hidden">
           <PartsPalette
             mode={mode}
-            onStartPlacing={(type) => setMode({ kind: "placing", type })}
+            onStartPlacing={(presetId) => setMode({ kind: "placing", presetId })}
             onStartWiring={() => setMode({ kind: "wiring" })}
             onCancel={() => setMode({ kind: "idle" })}
           />
@@ -226,6 +251,7 @@ export function BreadboardLab() {
             }
             onTogglePressed={handleTogglePressed}
             onWiperChange={handleWiperChange}
+            onLightLevelChange={handleLightLevelChange}
             onRemove={handleRemove}
           />
         </div>

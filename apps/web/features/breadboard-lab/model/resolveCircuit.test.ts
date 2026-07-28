@@ -9,6 +9,7 @@ const ledParams = {
   forwardVoltageVolts: 2,
   ratedCurrentAmps: 0.02,
   maxCurrentAmps: 0.03,
+  color: "red" as const,
 };
 
 function resistor(id: string, leads: PlacedResistor["leads"]): PlacedResistor {
@@ -143,6 +144,119 @@ describe("resolveCircuit — empty board", () => {
     // the user built, it's just an empty board, and should say so.
     const result = resolveCircuit(30, [], [], 5);
     expect(result.status).toBe("empty");
+  });
+});
+
+describe("resolveCircuit — buzzer as a resistive load", () => {
+  it("conducts and reports buzzing for an active buzzer", () => {
+    const components: PlacedComponent[] = [
+      {
+        id: "bz1",
+        type: "buzzer",
+        params: {
+          kind: "active",
+          ratedVoltageVolts: 5,
+          ratedCurrentAmps: 0.03,
+          maxCurrentAmps: 0.05,
+        },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        health: { status: "nominal" },
+      },
+    ];
+    const result = resolveCircuit(30, components, [], 5);
+    expect(result.status).toBe("conducting");
+    if (result.status !== "conducting") return;
+    expect(
+      (result.componentResults.get("bz1")?.visual as { isBuzzing: boolean }).isBuzzing
+    ).toBe(true);
+  });
+
+  it("stays silent for a passive buzzer even while current flows", () => {
+    const components: PlacedComponent[] = [
+      {
+        id: "bz1",
+        type: "buzzer",
+        params: {
+          kind: "passive",
+          ratedVoltageVolts: 5,
+          ratedCurrentAmps: 0.03,
+          maxCurrentAmps: 0.05,
+        },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        health: { status: "nominal" },
+      },
+    ];
+    const result = resolveCircuit(30, components, [], 5);
+    expect(result.status).toBe("conducting");
+    if (result.status !== "conducting") return;
+    expect(
+      (result.componentResults.get("bz1")?.visual as { isBuzzing: boolean }).isBuzzing
+    ).toBe(false);
+  });
+});
+
+describe("resolveCircuit — DC motor as a resistive load", () => {
+  it("conducts and reports a nonzero speed", () => {
+    const components: PlacedComponent[] = [
+      {
+        id: "m1",
+        type: "dcMotor",
+        params: { ratedVoltageVolts: 6, ratedCurrentAmps: 0.1, stallCurrentAmps: 0.4 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        health: { status: "nominal" },
+      },
+    ];
+    const result = resolveCircuit(30, components, [], 5);
+    expect(result.status).toBe("conducting");
+    if (result.status !== "conducting") return;
+    expect(
+      (result.componentResults.get("m1")?.visual as { speedFraction: number })
+        .speedFraction
+    ).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveCircuit — LDR as a light-controlled variable resistor", () => {
+  it("draws more current in bright simulated light than in darkness", () => {
+    const buildComponents = (lightLevel: number): PlacedComponent[] => [
+      {
+        id: "ldr1",
+        type: "ldr",
+        params: { minResistanceOhms: 500, maxResistanceOhms: 1_000_000 },
+        leads: [POSITIVE_RAIL, NEGATIVE_RAIL],
+        lightLevel,
+        health: { status: "nominal" },
+      },
+    ];
+    const dark = resolveCircuit(30, buildComponents(0), [], 5);
+    const bright = resolveCircuit(30, buildComponents(1), [], 5);
+    expect(dark.status).toBe("conducting");
+    expect(bright.status).toBe("conducting");
+    if (dark.status !== "conducting" || bright.status !== "conducting") return;
+    expect(bright.currentAmps).toBeGreaterThan(dark.currentAmps);
+  });
+});
+
+describe("resolveCircuit — battery holder as a transparent pass-through", () => {
+  it("conducts the same current as a plain wire would, and displays the real supply voltage", () => {
+    const components: PlacedComponent[] = [
+      resistor("r1", [POSITIVE_RAIL, STRIP_1]),
+      {
+        id: "batt1",
+        type: "batteryHolder",
+        params: {},
+        leads: [STRIP_1, NEGATIVE_RAIL],
+        health: { status: "nominal" },
+      },
+    ];
+    const result = resolveCircuit(30, components, [], 9);
+    expect(result.status).toBe("conducting");
+    if (result.status !== "conducting") return;
+    expect(result.currentAmps).toBeCloseTo(9 / 220);
+    expect(
+      (result.componentResults.get("batt1")?.visual as { suppliedVoltageVolts: number })
+        .suppliedVoltageVolts
+    ).toBe(9);
   });
 });
 

@@ -9,12 +9,14 @@ export function Inspector({
   result,
   onTogglePressed,
   onWiperChange,
+  onLightLevelChange,
   onRemove,
 }: {
   component: PlacedComponent | null;
   result: ComponentResult | undefined;
   onTogglePressed: (id: string) => void;
   onWiperChange: (id: string, wiperPosition: number) => void;
+  onLightLevelChange: (id: string, lightLevel: number) => void;
   onRemove: (id: string) => void;
 }) {
   if (!component) {
@@ -59,15 +61,21 @@ export function Inspector({
         )}
 
         {component.type === "led" && result && (
-          <div className="flex justify-between">
-            <dt className="text-charcoal-muted">Brightness</dt>
-            <dd>
-              {Math.round(
-                ((result.visual as { brightness: number }).brightness ?? 0) * 100
-              )}
-              %
-            </dd>
-          </div>
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Color</dt>
+              <dd className="capitalize">{component.params.color}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Brightness</dt>
+              <dd>
+                {Math.round(
+                  ((result.visual as { brightness: number }).brightness ?? 0) * 100
+                )}
+                %
+              </dd>
+            </div>
+          </>
         )}
 
         {component.type === "diode" && result && (
@@ -75,6 +83,53 @@ export function Inspector({
             <dt className="text-charcoal-muted">Conducting</dt>
             <dd>
               {(result.visual as { isConducting: boolean }).isConducting ? "Yes" : "No"}
+            </dd>
+          </div>
+        )}
+
+        {component.type === "buzzer" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Sound</dt>
+            <dd>
+              {(result.visual as { isBuzzing: boolean }).isBuzzing
+                ? "Buzzing"
+                : component.params.kind === "passive"
+                  ? "Silent (needs a signal, not just power)"
+                  : "Silent"}
+            </dd>
+          </div>
+        )}
+
+        {component.type === "dcMotor" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Speed</dt>
+            <dd>
+              {Math.round(
+                ((result.visual as { speedFraction: number }).speedFraction ?? 0) * 100
+              )}
+              %
+            </dd>
+          </div>
+        )}
+
+        {component.type === "ldr" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Resistance</dt>
+            <dd>
+              {Math.round(
+                (result.visual as { effectiveResistanceOhms: number })
+                  .effectiveResistanceOhms
+              ).toLocaleString()}
+              Ω
+            </dd>
+          </div>
+        )}
+
+        {component.type === "batteryHolder" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Supplying</dt>
+            <dd>
+              {(result.visual as { suppliedVoltageVolts: number }).suppliedVoltageVolts}V
             </dd>
           </div>
         )}
@@ -90,7 +145,13 @@ export function Inspector({
               : "border-hairline bg-white text-charcoal"
           }`}
         >
-          {component.pressed ? "Pressed (click to release)" : "Released (click to press)"}
+          {component.params.isMomentary
+            ? component.pressed
+              ? "Pressed (click to release)"
+              : "Released (click to press)"
+            : component.pressed
+              ? "On (click to turn off)"
+              : "Off (click to turn on)"}
         </button>
       )}
 
@@ -104,6 +165,20 @@ export function Inspector({
             step={0.01}
             value={component.wiperPosition}
             onChange={(e) => onWiperChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "ldr" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated light level
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.lightLevel}
+            onChange={(e) => onLightLevelChange(component.id, Number(e.target.value))}
           />
         </label>
       )}

@@ -1,16 +1,7 @@
 "use client";
 
-import { PART_LABELS } from "../constants";
-import type { BreadboardComponentType } from "../model/types";
+import { PART_PRESETS } from "../constants";
 import type { InteractionMode } from "../model/interactionMode";
-
-const PART_TYPES: BreadboardComponentType[] = [
-  "resistor",
-  "led",
-  "diode",
-  "pushbutton",
-  "potentiometer",
-];
 
 export function PartsPalette({
   mode,
@@ -19,10 +10,15 @@ export function PartsPalette({
   onCancel,
 }: {
   mode: InteractionMode;
-  onStartPlacing: (type: BreadboardComponentType) => void;
+  onStartPlacing: (presetId: string) => void;
   onStartWiring: () => void;
   onCancel: () => void;
 }) {
+  const activePreset =
+    mode.kind === "placing"
+      ? PART_PRESETS.find((p) => p.id === mode.presetId)
+      : undefined;
+
   return (
     <aside
       aria-label="Parts palette"
@@ -31,25 +27,25 @@ export function PartsPalette({
       <p className="text-[12px] font-medium uppercase tracking-[0.1em] text-charcoal-muted">
         Parts
       </p>
-      <div className="flex flex-col gap-2">
-        {PART_TYPES.map((type) => (
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+        {PART_PRESETS.map((preset) => (
           <button
-            key={type}
+            key={preset.id}
             type="button"
-            onClick={() => onStartPlacing(type)}
-            aria-pressed={mode.kind === "placing" && mode.type === type}
+            onClick={() => onStartPlacing(preset.id)}
+            aria-pressed={mode.kind === "placing" && mode.presetId === preset.id}
             className={`rounded-sm border px-3 py-2 text-left text-[13.5px] transition-colors ${
-              mode.kind === "placing" && mode.type === type
+              mode.kind === "placing" && mode.presetId === preset.id
                 ? "border-navy bg-navy text-ivory"
                 : "border-hairline bg-white text-charcoal hover:border-charcoal/25"
             }`}
           >
-            {PART_LABELS[type]}
+            {preset.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-2 border-t border-hairline pt-3">
+      <div className="border-t border-hairline pt-3">
         <button
           type="button"
           onClick={onStartWiring}
@@ -68,19 +64,19 @@ export function PartsPalette({
         <button
           type="button"
           onClick={onCancel}
-          className="mt-1 text-left text-[12px] text-charcoal-muted hover:text-charcoal"
+          className="text-left text-[12px] text-charcoal-muted hover:text-charcoal"
         >
           Cancel
         </button>
       )}
 
-      <p className="mt-auto border-t border-hairline pt-3 text-[12px] leading-relaxed text-charcoal-muted">
+      <p className="border-t border-hairline pt-3 text-[12px] leading-relaxed text-charcoal-muted">
         {mode.kind === "placing" &&
-          (mode.type === "led" || mode.type === "diode") &&
+          (activePreset?.type === "led" || activePreset?.type === "diode") &&
           "Click the anode (+) hole first, then the cathode (−) hole."}
         {mode.kind === "placing" &&
-          mode.type !== "led" &&
-          mode.type !== "diode" &&
+          activePreset?.type !== "led" &&
+          activePreset?.type !== "diode" &&
           "Click two holes to place it."}
         {mode.kind === "wiring" && "Click two holes to connect them."}
         {mode.kind === "idle" &&

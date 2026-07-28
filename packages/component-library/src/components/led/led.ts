@@ -9,6 +9,11 @@ import {
   VisualState,
 } from "../../contract/types";
 
+/** Which real LED color this instance represents — display metadata only,
+ * it doesn't feed into the electrical model (that's `forwardVoltageVolts`,
+ * which a palette entry sets to match the chosen color's real Vf). */
+export type LedColor = "red" | "green" | "blue" | "yellow" | "white";
+
 export interface LedParams {
   /** ~2V for red, ~3.2V for blue/white, per spec Part 2.2. */
   forwardVoltageVolts: number;
@@ -16,6 +21,8 @@ export interface LedParams {
   ratedCurrentAmps: number;
   /** Absolute max before failure, e.g. 0.03–0.04 (30–40mA), per spec Part 2.2. */
   maxCurrentAmps: number;
+  /** Which color to render when lit — see `LedColor`. */
+  color: LedColor;
 }
 
 /**

@@ -20,12 +20,12 @@ test.describe("Breadboard Lab", () => {
       page.getByRole("button", { name: label, exact: true }).first();
 
     // Resistor: top-positive rail -> column 3
-    await page.getByRole("button", { name: "Resistor", exact: true }).click();
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
     await hole("Breadboard hole, top-positive rail").click();
     await hole("Breadboard hole, row a, column 3").click();
 
     // LED: column 3 (ties to the resistor's far lead) -> column 5
-    await page.getByRole("button", { name: "LED", exact: true }).click();
+    await page.getByRole("button", { name: "LED (Red)", exact: true }).click();
     await hole("Breadboard hole, row b, column 3").click();
     await hole("Breadboard hole, row a, column 5").click();
 
