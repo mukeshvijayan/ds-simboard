@@ -1,9 +1,7 @@
 # ADR 0028: Raspberry Pi as a canvas component — feasibility research only
 
 - **Date:** 2026-07-29
-- **Status:** Research — not decided; explicit stop for user input per P2-3's
-  standing instruction (Raspberry Pi is a mandatory stop, not a routine
-  architectural decision to make and proceed on)
+- **Status:** Resolved — out of scope for now (see Resolution below)
 
 ## Context
 
@@ -74,21 +72,32 @@ search):
 
 ## Decision
 
-**None yet — this is the stop.** Two independent questions for the
-project owner, since they change the answer:
+Two independent questions were raised for the project owner, since they
+change the answer: which "Raspberry Pi" was meant (Pico vs. the full
+Linux SBC), and — if the SBC — whether to accept Velxio's AGPLv3/
+commercial licensing tradeoff. See Resolution below for how this was
+actually answered.
 
-1. **Which "Raspberry Pi" was meant?** If Raspberry Pi Pico (Option A),
-   this is a well-scoped, low-risk follow-up nearly identical in shape
-   to the Arduino Uno work just shipped — no new licensing question, a
-   real MIT-licensed emulator already exists. If the full Linux-capable
-   Raspberry Pi SBC (Option B), that's a materially bigger, materially
-   riskier undertaking.
-2. **If Option B is actually wanted**, a further real decision: accept
-   Velxio's AGPLv3/commercial licensing tradeoff (and its youth as a
-   dependency), or decline it and either scope Pi support out entirely
-   or commit to a genuine from-scratch WASM/QEMU effort later.
+## Resolution
 
-Not proceeding on either option without that answer.
+The full Linux-capable Raspberry Pi SBC (Option B) was the one meant.
+On learning that Velxio isn't a library but a separate, self-hosted
+full-stack service (its own Python/FastAPI/QEMU backend, no npm
+package, no documented embedding API) — meaning "integrate it" would
+mean standing up and hosting a second backend service, not just adding
+a dependency — **Raspberry Pi support was pulled back out of scope
+entirely.** No AGPL relicensing, no Velxio integration, no separate
+infrastructure. Reasoning: a repo-wide license change (this project
+currently has no LICENSE file at all — AGPL would be its first) is a
+legal decision that needs real legal input specifically, not something
+to settle as a side effect of one board-integration task.
+
+Arduino Uno and ESP32 (ADR 0027) remain the boards on the canvas.
+Raspberry Pi is not planned further unless it becomes a real priority
+later, at which point it needs its own properly-scoped decision —
+starting with which product (Pico vs. SBC) is actually wanted, and, if
+the SBC, a licensing decision made with real legal input rather than
+inside a board-integration task.
 
 ## Alternatives considered
 
@@ -104,9 +113,14 @@ Not proceeding on either option without that answer.
 
 ## Consequences
 
-- No Raspberry Pi (either kind) is on the canvas yet.
-- Whichever answer comes back, the follow-up work is well-scoped: Pico
-  reuses ADR 0027's architecture almost unchanged; the full SBC (if
-  pursued) needs its own architecture ADR for an OS-mediated GPIO
-  bridge, plus a resolved licensing decision, before any building
-  starts.
+- No Raspberry Pi (either kind) is on the canvas, and none is planned
+  for the current Phase 2 work.
+- This repo has no LICENSE file and stays that way — the AGPL question
+  was never acted on (no file was ever written to the repo; nothing to
+  revert).
+- If Raspberry Pi support is revisited later: Pico would reuse ADR
+  0027's architecture almost unchanged, no licensing question attached.
+  The full SBC would need its own architecture ADR for an OS-mediated
+  GPIO bridge, a real infrastructure/hosting decision, and a licensing
+  decision made with actual legal input — not bundled into a board-
+  integration task the way this pass approached it.
