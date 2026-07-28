@@ -1,14 +1,19 @@
-import { CircuitGraph, solveSeriesLoopFromGraph } from "@ds-simboard/circuit-engine";
+import { CircuitGraph, solveMnaFromGraphWithDiodes } from "@ds-simboard/circuit-engine";
 import { applyShortCircuitHealth } from "../contract/health";
 import { NOMINAL_HEALTH } from "../contract/types";
-import { evaluateResistor, resistorSeriesElement } from "../components/resistor/resistor";
-import { evaluateLed, ledSeriesElement } from "../components/led/led";
+import { evaluateResistor } from "../components/resistor/resistor";
+import { evaluateLed } from "../components/led/led";
 
 /**
  * Spec Part 5.4's named golden path, proven through the real
  * `circuit-engine` graph and solver rather than asserted by hand: "place
  * LED + resistor + battery → it lights up; remove resistor → it burns
- * out."
+ * out." Migrated to the general MNA/diode solver per A-Engine M3
+ * (docs/architecture/0020-*.md) — unlike the retired
+ * `solveSeriesLoopFromGraph` version, this doesn't tell the solver the
+ * LED is forward-biased in advance; the iterative companion-model
+ * solver determines that itself from topology alone, the same as it
+ * would for a real breadboard.
  */
 describe("golden path: LED + resistor + battery", () => {
   const resistorParams = { resistanceOhms: 220, ratedPowerWatts: 0.25 };
@@ -22,32 +27,38 @@ describe("golden path: LED + resistor + battery", () => {
 
   it("lights up when wired with a correctly-sized series resistor", () => {
     const graph = new CircuitGraph();
-    graph.addElement({ id: "supply", nodeA: "n0", nodeB: "n1" });
-    graph.addElement({ id: "r1", nodeA: "n1", nodeB: "n2" });
-    graph.addElement({ id: "led1", nodeA: "n2", nodeB: "n0" });
+    graph.addElement({ id: "supply", nodeA: "positive", nodeB: "ground" });
+    graph.addElement({ id: "r1", nodeA: "positive", nodeB: "mid" });
+    graph.addElement({ id: "led1", nodeA: "mid", nodeB: "ground" });
 
-    const outcome = solveSeriesLoopFromGraph(graph, "supply", supplyVoltage, (id) =>
-      id === "r1"
-        ? resistorSeriesElement(resistorParams)
-        : ledSeriesElement(ledParams, "forward", NOMINAL_HEALTH)
+    const outcome = solveMnaFromGraphWithDiodes(graph, "ground", (id) =>
+      id === "supply"
+        ? { kind: "voltage-source", voltageVolts: supplyVoltage }
+        : id === "r1"
+          ? { kind: "resistive" as const, resistanceOhms: resistorParams.resistanceOhms }
+          : {
+              kind: "diode",
+              forwardVoltageVolts: ledParams.forwardVoltageVolts,
+              reverseResistanceOhms: Infinity,
+            }
     );
 
-    expect(outcome.kind).toBe("conducting");
-    if (outcome.kind !== "conducting") return;
+    expect(outcome.kind).toBe("solved");
+    if (outcome.kind !== "solved") return;
+    expect(outcome.diodeStates.get("led1")).toBe("conducting");
 
+    const current = outcome.elementCurrentsAmps.get("led1") as number;
     // (5 - 2) / 220 ≈ 13.6mA — safely between 0 and the LED's 20mA rating.
-    expect(outcome.currentAmps).toBeCloseTo(
-      (supplyVoltage - ledParams.forwardVoltageVolts) / 220
-    );
+    expect(current).toBeCloseTo((supplyVoltage - ledParams.forwardVoltageVolts) / 220);
 
     const resistorResult = evaluateResistor(
       resistorParams,
-      { currentAmps: outcome.currentAmps },
+      { currentAmps: current },
       { health: NOMINAL_HEALTH }
     );
     const ledResult = evaluateLed(
       ledParams,
-      { biased: "forward", currentAmps: outcome.currentAmps },
+      { biased: "forward", currentAmps: current },
       { health: NOMINAL_HEALTH }
     );
 
@@ -58,11 +69,17 @@ describe("golden path: LED + resistor + battery", () => {
 
   it("burns out when the series resistor is removed entirely", () => {
     const graph = new CircuitGraph();
-    graph.addElement({ id: "supply", nodeA: "n0", nodeB: "n1" });
-    graph.addElement({ id: "led1", nodeA: "n1", nodeB: "n0" });
+    graph.addElement({ id: "supply", nodeA: "positive", nodeB: "ground" });
+    graph.addElement({ id: "led1", nodeA: "positive", nodeB: "ground" });
 
-    const outcome = solveSeriesLoopFromGraph(graph, "supply", supplyVoltage, () =>
-      ledSeriesElement(ledParams, "forward", NOMINAL_HEALTH)
+    const outcome = solveMnaFromGraphWithDiodes(graph, "ground", (id) =>
+      id === "supply"
+        ? { kind: "voltage-source", voltageVolts: supplyVoltage }
+        : {
+            kind: "diode",
+            forwardVoltageVolts: ledParams.forwardVoltageVolts,
+            reverseResistanceOhms: Infinity,
+          }
     );
 
     // No resistive element anywhere in the loop, and 5V is enough to
