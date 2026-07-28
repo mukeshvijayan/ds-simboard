@@ -39,3 +39,14 @@ export type {
 
 export { solveMnaFromGraph } from "./mna/mnaGraphBridge";
 export type { MnaElementDescriptor } from "./mna/mnaGraphBridge";
+
+export { solveMnaWithDiodes } from "./mna/mnaDiode";
+export type {
+  MnaDiode,
+  MnaNetworkWithDiodes,
+  MnaDiodeState,
+  MnaDiodeSolveResult,
+} from "./mna/mnaDiode";
+
+export { solveMnaFromGraphWithDiodes } from "./mna/mnaDiodeGraphBridge";
+export type { MnaDiodeElementDescriptor } from "./mna/mnaDiodeGraphBridge";
