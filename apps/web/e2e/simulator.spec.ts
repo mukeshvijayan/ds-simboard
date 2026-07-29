@@ -314,6 +314,70 @@ test.describe("Simulator", () => {
     await expect(page.getByRole("log").getByText("On-board LED on")).toBeVisible();
   });
 
+  test("the grade-tier filter narrows the palette without touching already-placed parts (P2-6)", async ({
+    page,
+  }) => {
+    await page.goto("/simulator");
+
+    // "All" is the default — every tier's parts are visible, including
+    // an Advanced-tier one (Relay Module) and both board-add buttons.
+    await expect(
+      page.getByRole("button", { name: "Relay Module", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "+ Arduino Uno", exact: true })
+    ).toBeVisible();
+
+    // Place a Foundations-tier resistor before filtering — it must stay
+    // on the canvas regardless of which tier is active afterward.
+    await page.getByRole("button", { name: "Resistor (220Ω)", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Breadboard hole, top-positive rail", exact: true })
+      .first()
+      .click();
+    await page
+      .getByRole("button", { name: "Breadboard hole, row a, column 3", exact: true })
+      .first()
+      .click();
+    await expect(page.getByRole("button", { name: /^Resistor resistor-/ })).toBeVisible();
+
+    // Switch to Foundations — Advanced-tier parts and boards disappear
+    // from the palette, but the already-placed resistor is untouched.
+    await page.getByRole("button", { name: "Foundations", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Relay Module", exact: true })
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Transistor (NPN Switch)", exact: true })
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "+ Arduino Uno", exact: true })
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Resistor (220Ω)", exact: true })
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Resistor resistor-/ })).toBeVisible();
+
+    // Switch to Building — the Foundations resistor preset disappears
+    // too (it's not offered there), replaced by grade 6-8 sensors.
+    await page.getByRole("button", { name: "Building", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Resistor (220Ω)", exact: true })
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Motion Sensor (PIR)", exact: true })
+    ).toBeVisible();
+
+    // Back to All restores everything.
+    await page.getByRole("button", { name: "All", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Resistor (220Ω)", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Relay Module", exact: true })
+    ).toBeVisible();
+  });
+
   test("has no automatically detectable accessibility violations", async ({ page }) => {
     await page.goto("/simulator");
     const results = await new AxeBuilder({ page }).analyze();
