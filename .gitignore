@@ -15,3 +15,5 @@ playwright-report
 test-results
 blob-report
 .vercel
+scripts/component-images/originals/
+__pycache__/

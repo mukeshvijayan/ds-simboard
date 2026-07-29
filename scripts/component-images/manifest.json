@@ -1,0 +1,52 @@
+{
+  "components": [
+    {
+      "componentId": "resistor-220ohm",
+      "searchQuery": "resistor electronic component",
+      "source": "pexels",
+      "photoId": "6586771",
+      "photoPageUrl": "https://www.pexels.com/photo/resistor-and-steel-wire-6586771/",
+      "originalImageUrl": "https://images.pexels.com/photos/6586771/pexels-photo-6586771.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+      "photographer": "Zacharias Korsalka",
+      "photographerUrl": "https://www.pexels.com/@zacharias-korsalka-1546303",
+      "license": "Pexels License (https://www.pexels.com/license/) \u2014 every photo on Pexels is covered by this one platform-wide license, not a per-photo field: free for commercial and noncommercial use, no attribution required, modification permitted. Not permitted: reselling/redistributing an unmodified copy as stock photography, or implying endorsement by the people/brands in a photo.",
+      "fetchedAt": "2026-07-29T06:50:28.550504+00:00",
+      "originalWidthPx": 6000,
+      "originalHeightPx": 4000,
+      "processedFile": "apps/web/public/images/components/resistor-220ohm.png",
+      "backgroundRemoved": true,
+      "calibrationNotes": "NOT USABLE AS-IS, two separate real problems found: (1) value mismatch \u2014 this resistor's bands are yellow-violet-red-gold = 4700 ohm, not the 220 ohm (red-red-brown-gold) the pilot needed; stock photography can't be commissioned to show an exact value on demand. (2) background-removal failure \u2014 the original photo has a wire-stripper tool in sharp focus in the foreground and the resistor slightly out-of-focus behind it; rembg's saliency model kept the sharp tool and erased most of the actual resistor, including its color bands. Confirms the pipeline's search/download/license/manifest steps work correctly; does NOT confirm rembg is reliable on multi-object, multi-depth-of-field stock photos without a manual crop step first."
+    },
+    {
+      "componentId": "power-supply",
+      "searchQuery": "power adapter charger white background",
+      "source": "pexels",
+      "photoId": "3921700",
+      "photoPageUrl": "https://www.pexels.com/photo/white-adapter-on-white-surface-3921700/",
+      "originalImageUrl": "https://images.pexels.com/photos/3921700/pexels-photo-3921700.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+      "photographer": "ready made",
+      "photographerUrl": "https://www.pexels.com/@readymade",
+      "license": "Pexels License (https://www.pexels.com/license/) \u2014 every photo on Pexels is covered by this one platform-wide license, not a per-photo field: free for commercial and noncommercial use, no attribution required, modification permitted. Not permitted: reselling/redistributing an unmodified copy as stock photography, or implying endorsement by the people/brands in a photo.",
+      "fetchedAt": "2026-07-29T06:50:30.929324+00:00",
+      "originalWidthPx": 2832,
+      "originalHeightPx": 4240,
+      "processedFile": "apps/web/public/images/components/power-supply.png",
+      "backgroundRemoved": true,
+      "calibrationNotes": "Single isolated wall-adapter object, plain light surface. No leads/holes to calibrate."
+    },
+    {
+      "componentId": "breadboard",
+      "searchQuery": "breadboard electronics / empty breadboard no wires / breadboard prototyping board flat lay",
+      "source": null,
+      "status": "skipped",
+      "reason": "No candidate met the bar after 3 query variations and reviewing ~8 real photos. Best available were either (a) an empty breadboard still in shrink-wrap packaging on a yellow background, shot at an angle, with plastic glare partly obscuring the hole grid (Pexels photo 35673092), or (b) a genuinely clean top-down empty breadboard with a fully populated circuit on top — components/wires plugged into most holes (Pexels photo 32894960). Neither is an unobstructed, flat, empty grid suitable for pixel-accurate hole calibration. Not selected rather than forcing a poor match."
+    },
+    {
+      "componentId": "led-red-off",
+      "searchQuery": "red LED diode component / red LED light close up / 5mm LED bulb electronic component macro / small LED light emitting diode",
+      "source": null,
+      "status": "skipped",
+      "reason": "No candidate found across 4 query variations. Pexels' free library returned car tail lights, neon signs, traffic lights, and household screw-base light bulbs for every LED-related query, but no macro photo of an actual 5mm through-hole LED (the small two-legged component this app's breadboard needs). This looks like a real coverage gap in this specific stock library for this specific niche electronic part, not a search-tuning problem."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+requests==2.34.2
+rembg==2.0.77
+onnxruntime==1.23.2
+pillow==12.3.0
+numpy==2.3.5
