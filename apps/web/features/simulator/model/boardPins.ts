@@ -49,24 +49,33 @@ const UNO_DIGITAL_PINS: BoardPinLayout[] = BOARD_DIGITAL_PINS.arduinoUno.map(
   })
 );
 
+/** Mirrors `ArduinoUno.tsx`'s own analog header tick position exactly
+ * (`x = 252 + i*26`, `y = 232`) — the button sits *on the tick*, not on
+ * the label, which is drawn above it (see that file's comment: a button
+ * centered on its own label swallows the label visually). */
 const UNO_ANALOG_PINS: BoardPinLayout[] = ["A0", "A1", "A2", "A3", "A4", "A5"].map(
   (name, i) => ({
     name,
-    xPercent: pct(223 + i * 26, UNO_VIEWBOX.width),
-    yPercent: pct(252, UNO_VIEWBOX.height),
+    xPercent: pct(255 + i * 26, UNO_VIEWBOX.width),
+    yPercent: pct(237, UNO_VIEWBOX.height),
   })
 );
 
+/** Real Uno power-header order is IOREF/RESET/3.3V/5V/GND/GND/VIN
+ * (`ArduinoUno.tsx` draws the full row as silkscreen); only 5V and GND
+ * (positions 3 and 4) are modeled as real connection points, matching
+ * that same drawn tick position exactly (`x = 40 + i*26`, `y = 232`) —
+ * not the label position, drawn separately above the tick. */
 const UNO_POWER_PINS: BoardPinLayout[] = [
   {
     name: "5V",
-    xPercent: pct(368, UNO_VIEWBOX.width),
-    yPercent: pct(205, UNO_VIEWBOX.height),
+    xPercent: pct(43 + 3 * 26, UNO_VIEWBOX.width),
+    yPercent: pct(237, UNO_VIEWBOX.height),
   },
   {
     name: "GND",
-    xPercent: pct(368, UNO_VIEWBOX.width),
-    yPercent: pct(235, UNO_VIEWBOX.height),
+    xPercent: pct(43 + 4 * 26, UNO_VIEWBOX.width),
+    yPercent: pct(237, UNO_VIEWBOX.height),
   },
 ];
 
