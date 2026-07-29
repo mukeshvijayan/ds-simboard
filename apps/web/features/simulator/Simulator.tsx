@@ -27,6 +27,7 @@ import { BoardGlyph } from "./components/BoardGlyph";
 import { PartsPalette } from "./components/PartsPalette";
 import { Inspector } from "./components/Inspector";
 import { BoardInspector } from "./components/BoardInspector";
+import { CircuitHealthPanel } from "./components/CircuitHealthPanel";
 import { StatusBanner } from "./components/StatusBanner";
 import { AuthModal } from "./components/AuthModal";
 import { ProjectsModal } from "./components/ProjectsModal";
@@ -241,6 +242,7 @@ export function Simulator() {
   const [mode, setMode] = useState<InteractionMode>({ kind: "idle" });
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [selectedBreadboardId, setSelectedBreadboardId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<CanvasViewport>(INITIAL_VIEWPORT);
 
   // Every board's real running engine and per-tick electrical state
@@ -643,6 +645,7 @@ export function Simulator() {
     setSaveStatus({ kind: "idle" });
     setSelectedComponentId(null);
     setSelectedBoardId(null);
+    setSelectedBreadboardId(null);
 
     if (snapshot) {
       setBreadboards(snapshot.breadboards);
@@ -778,6 +781,7 @@ export function Simulator() {
               onBackgroundClick={() => {
                 setSelectedComponentId(null);
                 setSelectedBoardId(null);
+                setSelectedBreadboardId(null);
               }}
             >
               {breadboards.map((bb) => (
@@ -789,13 +793,20 @@ export function Simulator() {
                   componentResults={result.componentResults}
                   pendingPoints={pendingPoints}
                   selectedComponentId={selectedComponentId}
+                  isSelected={selectedBreadboardId === bb.id}
                   viewportScale={viewport.scale}
                   onHoleClick={handlePointClick}
                   onComponentClick={(id) => {
                     setSelectedComponentId(id);
                     setSelectedBoardId(null);
+                    setSelectedBreadboardId(null);
                   }}
                   onPositionChange={handleBreadboardPositionChange}
+                  onSelect={(id) => {
+                    setSelectedBreadboardId(id);
+                    setSelectedComponentId(null);
+                    setSelectedBoardId(null);
+                  }}
                 />
               ))}
               {boards.map((board) => (
@@ -816,6 +827,7 @@ export function Simulator() {
                   onSelect={(id) => {
                     setSelectedBoardId(id);
                     setSelectedComponentId(null);
+                    setSelectedBreadboardId(null);
                   }}
                   onPositionChange={handleBoardPositionChange}
                 />
@@ -823,7 +835,9 @@ export function Simulator() {
             </CanvasSurface>
           </div>
 
-          {selectedBoardId ? (
+          {selectedBreadboardId ? (
+            <CircuitHealthPanel components={components} result={result} />
+          ) : selectedBoardId ? (
             <BoardInspector
               board={boards.find((b) => b.id === selectedBoardId) ?? null}
               serialLines={esp32SerialLines.get(selectedBoardId) ?? []}

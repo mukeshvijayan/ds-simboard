@@ -52,10 +52,12 @@ export function BreadboardGlyph({
   componentResults,
   pendingPoints,
   selectedComponentId,
+  isSelected,
   viewportScale,
   onHoleClick,
   onComponentClick,
   onPositionChange,
+  onSelect,
 }: {
   breadboard: PlacedBreadboard;
   components: PlacedComponent[];
@@ -63,10 +65,12 @@ export function BreadboardGlyph({
   componentResults: Map<string, ComponentResult>;
   pendingPoints: ConnectionPointRef[];
   selectedComponentId: string | null;
+  isSelected: boolean;
   viewportScale: number;
   onHoleClick: (point: ConnectionPointRef) => void;
   onComponentClick: (id: string) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
+  onSelect: (id: string) => void;
 }) {
   const { columns } = breadboard;
   const columnRange = Array.from({ length: columns }, (_, i) => i + 1);
@@ -119,11 +123,18 @@ export function BreadboardGlyph({
     dragStart.current = null;
   }
 
+  function handleClick(event: React.MouseEvent) {
+    if (event.target !== event.currentTarget) return; // a hole/component handles its own click
+    onSelect(breadboard.id);
+  }
+
   return (
     <div
       role="group"
       aria-label="Breadboard — drag to move"
-      className="absolute cursor-grab rounded-sm border border-hairline bg-ivory p-3 shadow-sm active:cursor-grabbing"
+      className={`absolute cursor-grab rounded-sm border border-hairline bg-ivory p-3 shadow-sm active:cursor-grabbing ${
+        isSelected ? "ring-2 ring-navy ring-offset-1" : ""
+      }`}
       style={{
         left: breadboard.position.x,
         top: breadboard.position.y,
@@ -134,6 +145,7 @@ export function BreadboardGlyph({
       onMouseMove={handleMouseMove}
       onMouseUp={endDrag}
       onMouseLeave={endDrag}
+      onClick={handleClick}
     >
       <BreadboardArt columns={columns} />
       <svg
