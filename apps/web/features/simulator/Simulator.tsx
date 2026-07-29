@@ -30,6 +30,7 @@ import { BoardInspector } from "./components/BoardInspector";
 import { StatusBanner } from "./components/StatusBanner";
 import { AuthModal } from "./components/AuthModal";
 import { ProjectsModal } from "./components/ProjectsModal";
+import { PowerSupplyIcon } from "./components/glyphs/PowerSupplyIcon";
 import type { InteractionMode } from "./model/interactionMode";
 import type { ConnectionPointRef } from "./model/connectionPoint";
 import { componentHealthEquals, resolveCircuit } from "./model/resolveCircuit";
@@ -685,6 +686,7 @@ export function Simulator() {
         <div className="flex items-center justify-between gap-4 border-b border-hairline bg-ivory px-4 py-3">
           <StatusBanner result={result} />
           <div className="flex items-center gap-3">
+            <PowerSupplyIcon supplyVoltageVolts={supplyVoltage} />
             <label className="flex items-center gap-2 text-[13px] text-charcoal-muted">
               Supply
               <input

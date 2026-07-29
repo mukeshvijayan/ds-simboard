@@ -9,6 +9,7 @@ import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "../mode
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import { Hole } from "./Hole";
 import { ComponentGlyph } from "./ComponentGlyph";
+import { BreadboardArt } from "./glyphs/BreadboardArt";
 
 const STRIP_ROWS_UPPER: StripRow[] = ["a", "b", "c", "d", "e"];
 const STRIP_ROWS_LOWER: StripRow[] = ["f", "g", "h", "i", "j"];
@@ -134,6 +135,7 @@ export function BreadboardGlyph({
       onMouseUp={endDrag}
       onMouseLeave={endDrag}
     >
+      <BreadboardArt columns={columns} />
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 100 100"

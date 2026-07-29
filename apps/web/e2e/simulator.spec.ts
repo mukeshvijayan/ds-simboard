@@ -253,17 +253,17 @@ test.describe("Simulator", () => {
     ).toBeVisible();
 
     // Blink's tuned toggle interval is ~1s (see chip-emulation's
-    // programs/blink.ts) — poll the LED glyph's actual rendered color
-    // until the real, live-stepped avr8js CPU has driven pin 13 high at
-    // least once, lighting it for real (not scripted): lit red is
-    // rgb(214, 69, 69) (#D64545), vs. off's rgb(167, 165, 157) (#A7A59D).
+    // programs/blink.ts) — poll the hand-authored LedGlyph's own SVG
+    // aria-label (which reflects its `status` prop directly, P2-4b) until
+    // the real, live-stepped avr8js CPU has driven pin 13 high at least
+    // once, lighting it for real (not scripted).
     const ledGlyph = page.getByRole("button", { name: /^LED led-/ });
     await expect(ledGlyph).toBeVisible();
     await expect
-      .poll(async () => ledGlyph.evaluate((el) => getComputedStyle(el).backgroundColor), {
+      .poll(async () => ledGlyph.locator("svg").getAttribute("aria-label"), {
         timeout: 15_000,
       })
-      .toBe("rgb(214, 69, 69)");
+      .toBe("red LED, lit");
     await expect(
       page.getByRole("button", { name: /^LED led-.*, failed/ })
     ).not.toBeVisible();
@@ -302,10 +302,10 @@ test.describe("Simulator", () => {
     const ledGlyph = page.getByRole("button", { name: /^LED led-/ });
     await expect(ledGlyph).toBeVisible();
     await expect
-      .poll(async () => ledGlyph.evaluate((el) => getComputedStyle(el).backgroundColor), {
+      .poll(async () => ledGlyph.locator("svg").getAttribute("aria-label"), {
         timeout: 15_000,
       })
-      .toBe("rgb(214, 69, 69)");
+      .toBe("red LED, lit");
 
     // The default sketch's real Serial.println output — SketchEngine's
     // interpreter, not avr8js, but the same "genuinely emitted, not

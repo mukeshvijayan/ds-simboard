@@ -8,6 +8,8 @@ import type { LedColor } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import type { PlacedComponent } from "../model/types";
 import { PART_LABELS } from "../constants";
+import { LedGlyph, type LedVisualStatus } from "./glyphs/LedGlyph";
+import { ResistorGlyph } from "./glyphs/ResistorGlyph";
 
 const LED_LIT_COLORS: Record<LedColor, string> = {
   red: "#D64545",
@@ -124,6 +126,46 @@ export function ComponentGlyph({
   const color = glyphColor(component, result);
   const status = result ? overallHealthStatus(result.health) : "nominal";
   const failed = status === "failed";
+
+  // Hand-authored SVG artwork (P2-4b, closing ADR 0031/0032) — only LED
+  // and resistor so far; every other type keeps the plain colored-box
+  // rendering until the same treatment extends to it.
+  if (component.type === "led") {
+    const brightness = (result?.visual as { brightness?: number })?.brightness ?? 0;
+    const ledStatus: LedVisualStatus = failed ? "burned" : brightness > 0 ? "lit" : "off";
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(component.id)}
+        aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
+        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
+          isSelected ? "ring-2 ring-navy ring-offset-1" : ""
+        }`}
+        style={{ left: `${midX}%`, top: `${midY}%` }}
+      >
+        <LedGlyph
+          color={component.params.color}
+          status={ledStatus}
+          brightness={brightness}
+        />
+      </button>
+    );
+  }
+  if (component.type === "resistor") {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(component.id)}
+        aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
+        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
+          isSelected ? "ring-2 ring-navy ring-offset-1" : ""
+        }`}
+        style={{ left: `${midX}%`, top: `${midY}%` }}
+      >
+        <ResistorGlyph resistanceOhms={component.params.resistanceOhms} />
+      </button>
+    );
+  }
 
   return (
     <button
