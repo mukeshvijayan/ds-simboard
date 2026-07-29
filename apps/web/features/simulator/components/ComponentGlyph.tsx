@@ -1,23 +1,27 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { HoleAddress } from "@ds-simboard/circuit-engine";
 import { holePosition, resolveVisualColumn } from "../model/layout";
 import { overallHealthStatus, type ComponentResult } from "../model/resolveCircuit";
 import { componentLeadPoints } from "../model/componentElements";
-import type { LedColor } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "../model/connectionPoint";
-import type { PlacedComponent } from "../model/types";
+import { SEVEN_SEGMENT_NAMES, type PlacedComponent } from "../model/types";
 import { PART_LABELS } from "../constants";
 import { LedGlyph, type LedVisualStatus } from "./glyphs/LedGlyph";
 import { ResistorGlyph } from "./glyphs/ResistorGlyph";
-
-const LED_LIT_COLORS: Record<LedColor, string> = {
-  red: "#D64545",
-  green: "#4CAF6D",
-  blue: "#3B6FD6",
-  yellow: "#F4C542",
-  white: "#F4F1E8",
-};
+import { TransistorGlyph } from "./glyphs/TransistorGlyph";
+import { DiodeGlyph } from "./glyphs/DiodeGlyph";
+import { PushbuttonGlyph } from "./glyphs/PushbuttonGlyph";
+import { PotentiometerGlyph } from "./glyphs/PotentiometerGlyph";
+import { PirGlyph } from "./glyphs/PirGlyph";
+import { SoilMoistureGlyph } from "./glyphs/SoilMoistureGlyph";
+import { RainSensorGlyph } from "./glyphs/RainSensorGlyph";
+import { SoundSensorGlyph } from "./glyphs/SoundSensorGlyph";
+import { Dht11Glyph } from "./glyphs/Dht11Glyph";
+import { RgbLedGlyph } from "./glyphs/RgbLedGlyph";
+import { SevenSegmentGlyph } from "./glyphs/SevenSegmentGlyph";
+import { RelayGlyph } from "./glyphs/RelayGlyph";
 
 /** This canvas slice only renders components whose leads are breadboard
  * holes (P2-1's scope, per ADR 0024) — bare/freestanding leads get their
@@ -26,6 +30,9 @@ function holeOf(point: ConnectionPointRef): HoleAddress | null {
   return point.kind === "breadboardHole" ? point.hole : null;
 }
 
+/** Only the few types not yet given hand-authored SVG artwork fall
+ * through to this plain colored-box glyph (buzzer, DC motor, LDR,
+ * battery holder) — everything else has its own glyph below. */
 function glyphColor(
   component: PlacedComponent,
   result: ComponentResult | undefined
@@ -34,28 +41,6 @@ function glyphColor(
   if (status === "failed") return "#8a3b3b";
   if (status === "stressed") return "#b8862f";
 
-  if (component.type === "led" && result) {
-    const brightness = (result.visual as { brightness?: number }).brightness ?? 0;
-    return brightness > 0 ? LED_LIT_COLORS[component.params.color] : "#A7A59D";
-  }
-  if (component.type === "rgbLed" && result) {
-    const visual = result.visual as {
-      red: { visual: { brightness: number } };
-      green: { visual: { brightness: number } };
-      blue: { visual: { brightness: number } };
-    };
-    const r = Math.round(visual.red.visual.brightness * 255);
-    const g = Math.round(visual.green.visual.brightness * 255);
-    const b = Math.round(visual.blue.visual.brightness * 255);
-    return r + g + b > 0 ? `rgb(${r}, ${g}, ${b})` : "#A7A59D";
-  }
-  if (component.type === "sevenSegmentDisplay" && result) {
-    const visual = result.visual as {
-      segments: Record<string, { visual: { brightness: number } }>;
-    };
-    const anyLit = Object.values(visual.segments).some((s) => s.visual.brightness > 0);
-    return anyLit ? "#D64545" : "#A7A59D";
-  }
   if (component.type === "buzzer" && result) {
     const isBuzzing = (result.visual as { isBuzzing?: boolean }).isBuzzing ?? false;
     return isBuzzing ? "#8A6FC0" : "#6B4FA0";
@@ -71,30 +56,6 @@ function glyphColor(
   }
   if (component.type === "batteryHolder") {
     return "#2F6E4F";
-  }
-  if (component.type === "motionSensor") {
-    return component.motionDetected ? "#C9A63B" : "#6B6350";
-  }
-  if (component.type === "soilMoistureSensor") {
-    return component.wetness > 0.5 ? "#3B6FD6" : "#8A7A5C";
-  }
-  if (component.type === "rainSensor") {
-    return component.rainLevel > 0.5 ? "#3B6FD6" : "#8A7A5C";
-  }
-  if (component.type === "soundSensor") {
-    return component.loudness > 0.5 ? "#C9A63B" : "#6B6350";
-  }
-  if (component.type === "dht11") {
-    return "#4C7A8A";
-  }
-  if (component.type === "transistor" && result) {
-    const isOn = (result.visual as { isOn?: boolean }).isOn ?? false;
-    return isOn ? "#3FA6A6" : "#3B4C70";
-  }
-  if (component.type === "relay" && result) {
-    const isClosed = (result.visual as { contact: { visual: { isClosed: boolean } } })
-      .contact.visual.isClosed;
-    return isClosed ? "#3FA6A6" : "#3B4C70";
   }
   return "#3B4C70";
 }
@@ -123,50 +84,115 @@ export function ComponentGlyph({
   });
   const midX = positions.reduce((sum, p) => sum + p.xPercent, 0) / positions.length;
   const midY = positions.reduce((sum, p) => sum + p.yPercent, 0) / positions.length;
-  const color = glyphColor(component, result);
   const status = result ? overallHealthStatus(result.health) : "nominal";
   const failed = status === "failed";
 
-  // Hand-authored SVG artwork (P2-4b, closing ADR 0031/0032) — only LED
-  // and resistor so far; every other type keeps the plain colored-box
-  // rendering until the same treatment extends to it.
+  // Hand-authored SVG artwork (P2-4b pilot + rollout, ADR 0032/0033) —
+  // every type handled below renders its own original glyph; the few
+  // types not yet covered keep the plain generic colored-box glyph at
+  // the bottom of this function.
+  const wrap = (children: ReactNode) => (
+    <button
+      type="button"
+      onClick={() => onSelect(component.id)}
+      aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
+        isSelected ? "ring-2 ring-navy ring-offset-1" : ""
+      }`}
+      style={{ left: `${midX}%`, top: `${midY}%` }}
+    >
+      {children}
+    </button>
+  );
+
   if (component.type === "led") {
     const brightness = (result?.visual as { brightness?: number })?.brightness ?? 0;
     const ledStatus: LedVisualStatus = failed ? "burned" : brightness > 0 ? "lit" : "off";
-    return (
-      <button
-        type="button"
-        onClick={() => onSelect(component.id)}
-        aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
-        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
-          isSelected ? "ring-2 ring-navy ring-offset-1" : ""
-        }`}
-        style={{ left: `${midX}%`, top: `${midY}%` }}
-      >
-        <LedGlyph
-          color={component.params.color}
-          status={ledStatus}
-          brightness={brightness}
-        />
-      </button>
+    return wrap(
+      <LedGlyph
+        color={component.params.color}
+        status={ledStatus}
+        brightness={brightness}
+      />
     );
   }
   if (component.type === "resistor") {
-    return (
-      <button
-        type="button"
-        onClick={() => onSelect(component.id)}
-        aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
-        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
-          isSelected ? "ring-2 ring-navy ring-offset-1" : ""
-        }`}
-        style={{ left: `${midX}%`, top: `${midY}%` }}
-      >
-        <ResistorGlyph resistanceOhms={component.params.resistanceOhms} />
-      </button>
+    return wrap(<ResistorGlyph resistanceOhms={component.params.resistanceOhms} />);
+  }
+  if (component.type === "diode") {
+    return wrap(<DiodeGlyph failed={failed} />);
+  }
+  if (component.type === "transistor") {
+    const isOn = (result?.visual as { isOn?: boolean })?.isOn ?? false;
+    return wrap(<TransistorGlyph isOn={isOn} />);
+  }
+  if (component.type === "pushbutton") {
+    return wrap(
+      <PushbuttonGlyph
+        pressed={component.pressed}
+        isMomentary={component.params.isMomentary}
+      />
     );
   }
+  if (component.type === "potentiometer") {
+    return wrap(<PotentiometerGlyph wiperPosition={component.wiperPosition} />);
+  }
+  if (component.type === "motionSensor") {
+    return wrap(<PirGlyph motionDetected={component.motionDetected} />);
+  }
+  if (component.type === "soilMoistureSensor") {
+    return wrap(<SoilMoistureGlyph wetness={component.wetness} />);
+  }
+  if (component.type === "rainSensor") {
+    return wrap(<RainSensorGlyph rainLevel={component.rainLevel} />);
+  }
+  if (component.type === "soundSensor") {
+    return wrap(<SoundSensorGlyph loudness={component.loudness} />);
+  }
+  if (component.type === "dht11") {
+    return wrap(
+      <Dht11Glyph
+        temperatureCelsius={component.simulatedTemperatureCelsius}
+        humidityPercent={component.simulatedHumidityPercent}
+      />
+    );
+  }
+  if (component.type === "rgbLed") {
+    const visual = result?.visual as
+      | {
+          red: { visual: { brightness: number } };
+          green: { visual: { brightness: number } };
+          blue: { visual: { brightness: number } };
+        }
+      | undefined;
+    const r = Math.round((visual?.red.visual.brightness ?? 0) * 255);
+    const g = Math.round((visual?.green.visual.brightness ?? 0) * 255);
+    const b = Math.round((visual?.blue.visual.brightness ?? 0) * 255);
+    const anyLit = r + g + b > 0;
+    return wrap(
+      <RgbLedGlyph
+        mixedColor={anyLit ? `rgb(${r}, ${g}, ${b})` : "#A7A59D"}
+        anyLit={anyLit}
+      />
+    );
+  }
+  if (component.type === "sevenSegmentDisplay") {
+    const visual = result?.visual as
+      { segments: Record<string, { visual: { brightness: number } }> } | undefined;
+    const isLit = (name: string) => (visual?.segments[name]?.visual.brightness ?? 0) > 0;
+    const segments = Object.fromEntries(
+      SEVEN_SEGMENT_NAMES.filter((n) => n !== "dp").map((n) => [n, isLit(n)])
+    ) as Record<"a" | "b" | "c" | "d" | "e" | "f" | "g", boolean>;
+    return wrap(<SevenSegmentGlyph segments={segments} decimalPointLit={isLit("dp")} />);
+  }
+  if (component.type === "relay") {
+    const isClosed =
+      (result?.visual as { contact: { visual: { isClosed: boolean } } })?.contact.visual
+        .isClosed ?? false;
+    return wrap(<RelayGlyph contactClosed={isClosed} />);
+  }
 
+  const color = glyphColor(component, result);
   return (
     <button
       type="button"

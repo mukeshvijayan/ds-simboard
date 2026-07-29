@@ -37,8 +37,8 @@ export function LedGlyph({
   color = "red",
   status,
   brightness = 1,
-  width = 32,
-  height = 58,
+  width = 38,
+  height = 68,
 }: {
   color?: string;
   status: LedVisualStatus;
@@ -70,6 +70,30 @@ export function LedGlyph({
       <line x1="14" y1="30" x2="14" y2="58" stroke="#b8b8b8" strokeWidth="2" />
       {/* cathode lead (shorter) */}
       <line x1="26" y1="30" x2="26" y2="52" stroke="#b8b8b8" strokeWidth="2" />
+      {/* explicit polarity labels, in addition to the real lead-length cue
+       * — sized deliberately large relative to the glyph (pedagogical
+       * priority, Part 4: a label a student can't actually read at normal
+       * screen size doesn't count as labeled) */}
+      <text
+        x="14"
+        y="44"
+        fontSize="11"
+        textAnchor="middle"
+        fill="#3a9c4a"
+        fontWeight="bold"
+      >
+        +
+      </text>
+      <text
+        x="26"
+        y="44"
+        fontSize="11"
+        textAnchor="middle"
+        fill="#d6342c"
+        fontWeight="bold"
+      >
+        −
+      </text>
       {/* flange, with a flat edge on the cathode (right) side — real LED polarity marker */}
       <path
         d="M4 30 L36 30 L36 27 Q 20 22 4 27 Z"
