@@ -461,7 +461,7 @@ test.describe("Simulator", () => {
       page.getByRole("button", { name: "Resistor (220Ω)", exact: true })
     ).not.toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Motion Sensor (PIR)", exact: true })
+      page.getByRole("button", { name: "Digital Sensor (PIR Motion)", exact: true })
     ).toBeVisible();
 
     // Back to All restores everything.

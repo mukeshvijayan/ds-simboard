@@ -215,11 +215,29 @@ const RESISTOR_PRESETS: PartPreset[] = [
 export const PART_PRESETS: PartPreset[] = [
   ...RESISTOR_PRESETS,
   ...LED_PRESETS,
+  // Rectifier and Schottky are both accurately represented by the
+  // existing diode model as-is: real rectifier/Schottky diodes *are*
+  // permanently damaged if driven past their reverse voltage rating,
+  // which is exactly what `reverseBreakdownVoltageVolts` already models
+  // (docs/architecture/0037-*.md). A "Zener" preset is deliberately
+  // *not* added here — a real zener is specifically designed to conduct
+  // in reverse at its rated voltage *without* being damaged (voltage
+  // regulation, its whole purpose), the opposite of what this model's
+  // reverse-breakdown-as-failure represents; reusing it for a "Zener"
+  // preset would teach backwards physics, not a simplification of real
+  // physics. A real zener needs its own regulation-modeling electrical
+  // behavior, which is new component-library work, not a preset.
   {
-    id: "diode",
+    id: "diode-rectifier",
     type: "diode",
-    label: "Diode",
+    label: "Diode (Rectifier 1N4007)",
     params: { forwardVoltageVolts: 0.7, reverseBreakdownVoltageVolts: 1000 },
+  },
+  {
+    id: "diode-schottky",
+    type: "diode",
+    label: "Diode (Schottky 1N5819)",
+    params: { forwardVoltageVolts: 0.3, reverseBreakdownVoltageVolts: 40 },
   },
   {
     id: "pushbutton",
@@ -279,28 +297,82 @@ export const PART_PRESETS: PartPreset[] = [
     label: "Battery Holder",
     params: {},
   },
+  // motionSensor's own params are genuinely empty (`Record<string,
+  // never>` — a user-toggled digital trigger, nothing else to
+  // parameterize), so every real digital on/off sensor below is
+  // electrically identical to the PIR: this isn't a simplification that
+  // loses anything real, it's the same physics with a different real
+  // part's name on it (docs/architecture/0037-*.md).
   {
-    id: "motion-sensor",
+    id: "motion-sensor-pir",
     type: "motionSensor",
-    label: "Motion Sensor (PIR)",
+    label: "Digital Sensor (PIR Motion)",
+    params: {},
+  },
+  {
+    id: "motion-sensor-tilt",
+    type: "motionSensor",
+    label: "Digital Sensor (Tilt)",
+    params: {},
+  },
+  {
+    id: "motion-sensor-vibration",
+    type: "motionSensor",
+    label: "Digital Sensor (Vibration SW-420)",
+    params: {},
+  },
+  {
+    id: "motion-sensor-touch",
+    type: "motionSensor",
+    label: "Digital Sensor (Touch)",
+    params: {},
+  },
+  {
+    id: "motion-sensor-ir-obstacle",
+    type: "motionSensor",
+    label: "Digital Sensor (IR Obstacle)",
+    params: {},
+  },
+  {
+    id: "motion-sensor-hall",
+    type: "motionSensor",
+    label: "Digital Sensor (Hall Effect)",
     params: {},
   },
   {
     id: "soil-moisture-sensor",
     type: "soilMoistureSensor",
-    label: "Soil Moisture Sensor",
+    label: "Soil / Water Sensor (Soil Moisture)",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "water-level-sensor",
+    type: "soilMoistureSensor",
+    label: "Soil / Water Sensor (Water Level)",
     params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
   },
   {
     id: "rain-sensor",
     type: "rainSensor",
-    label: "Rain Sensor",
+    label: "Rain / Flame Sensor (Rain)",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "flame-sensor",
+    type: "rainSensor",
+    label: "Rain / Flame Sensor (Flame)",
     params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
   },
   {
     id: "sound-sensor",
     type: "soundSensor",
-    label: "Sound Sensor",
+    label: "Sound / Gas Sensor (Sound)",
+    params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
+  },
+  {
+    id: "gas-sensor",
+    type: "soundSensor",
+    label: "Sound / Gas Sensor (Gas MQ-2)",
     params: { minResistanceOhms: 1_000, maxResistanceOhms: 100_000 },
   },
   {
