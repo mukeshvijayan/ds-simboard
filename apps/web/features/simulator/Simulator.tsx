@@ -11,7 +11,6 @@ import {
   DEFAULT_SUPPLY_VOLTAGE,
   NOMINAL_HEALTH,
   PART_PRESETS,
-  presetLeadNames,
 } from "./constants";
 import { DesktopOnlyNotice } from "@/components/shared/DesktopOnlyNotice";
 import { SketchEngine } from "@/lib/simulation/engine";
@@ -24,6 +23,8 @@ import type { Project } from "@ds-simboard/shared-types";
 import { CanvasSurface } from "./components/CanvasSurface";
 import { BreadboardGlyph } from "./components/BreadboardGlyph";
 import { BoardGlyph } from "./components/BoardGlyph";
+import { ComponentGlyph } from "./components/ComponentGlyph";
+import { GlobalWireLayer, CANVAS_SIZE } from "./components/GlobalWireLayer";
 import { PartsPalette } from "./components/PartsPalette";
 import { Inspector } from "./components/Inspector";
 import { BoardInspector } from "./components/BoardInspector";
@@ -37,7 +38,9 @@ import type { ConnectionPointRef } from "./model/connectionPoint";
 import { componentHealthEquals, resolveCircuit } from "./model/resolveCircuit";
 import { boardPinElectricalStates } from "./model/boardBridge";
 import { BOARD_DIGITAL_PINS, BOARD_LOGIC_VOLTAGE } from "./model/boardPins";
+import { COMPONENT_LEAD_NAMES } from "./model/componentPinLayouts";
 import { serializeCanvas, type CanvasSnapshot } from "./model/persistence";
+import type { PaletteDragPayload } from "./model/dragPayload";
 import { SEVEN_SEGMENT_NAMES } from "./model/types";
 import type {
   BoardPinElectricalState,
@@ -60,9 +63,24 @@ const DEFAULT_BREADBOARD: PlacedBreadboard = {
   pixelHeight: 360,
 };
 
+function selfLead(componentId: string, leadName: string): ConnectionPointRef {
+  return { kind: "componentLead", componentItemId: componentId, leadName };
+}
+
+/**
+ * Builds a freshly-placed component at `position` (Part 2, docs/
+ * architecture/0036-*.md) — every lead starts wired to nothing but
+ * itself (`selfLead`), exactly like a real part fresh out of a parts
+ * bin: it physically exists, on the canvas, at a real position, but
+ * carries no electrical connection until the user draws a wire from
+ * one of its leads to a hole, a board pin, or another component's own
+ * lead. Supersedes the old version, which took the *already-clicked*
+ * hole/pin sequence as its leads — there's no such sequence any more,
+ * since placing a component is now a single click/drop, not N clicks.
+ */
 function createComponent(
   presetId: string,
-  points: ConnectionPointRef[]
+  position: { x: number; y: number }
 ): PlacedComponent {
   const preset = PART_PRESETS.find((p) => p.id === presetId);
   if (!preset) {
@@ -70,72 +88,78 @@ function createComponent(
   }
   const id = `${preset.type}-${nextId++}`;
   const health = NOMINAL_HEALTH;
+  const leadNames = COMPONENT_LEAD_NAMES[preset.type];
+  const lead = (name: string) => selfLead(id, name);
 
   if (preset.type === "rgbLed") {
-    const [commonLead, redLead, greenLead, blueLead] = points;
     return {
       id,
       type: preset.type,
       params: preset.params,
-      commonLead,
-      redLead,
-      greenLead,
-      blueLead,
+      position,
+      commonLead: lead(leadNames[0]),
+      redLead: lead(leadNames[1]),
+      greenLead: lead(leadNames[2]),
+      blueLead: lead(leadNames[3]),
       health: { red: health, green: health, blue: health },
     };
   }
   if (preset.type === "sevenSegmentDisplay") {
-    const [commonLead, ...segmentPoints] = points;
     const segmentLeads = {} as Record<SevenSegmentName, ConnectionPointRef>;
     const segmentHealth = {} as Record<SevenSegmentName, typeof health>;
-    SEVEN_SEGMENT_NAMES.forEach((name, index) => {
-      segmentLeads[name] = segmentPoints[index];
+    SEVEN_SEGMENT_NAMES.forEach((name) => {
+      segmentLeads[name] = lead(name);
       segmentHealth[name] = health;
     });
     return {
       id,
       type: preset.type,
       params: preset.params,
-      commonLead,
+      position,
+      commonLead: lead("common"),
       segmentLeads,
       health: segmentHealth,
     };
   }
   if (preset.type === "transistor") {
-    const [baseLead, collectorLead, emitterLead] = points;
     return {
       id,
       type: preset.type,
       params: preset.params,
-      baseLead,
-      collectorLead,
-      emitterLead,
+      position,
+      baseLead: lead("base"),
+      collectorLead: lead("collector"),
+      emitterLead: lead("emitter"),
       health,
     };
   }
   if (preset.type === "relay") {
-    const [coilLeadA, coilLeadB, contactLeadA, contactLeadB] = points;
     return {
       id,
       type: preset.type,
       params: preset.params,
-      coilLeadA,
-      coilLeadB,
-      contactLeadA,
-      contactLeadB,
+      position,
+      coilLeadA: lead("coilA"),
+      coilLeadB: lead("coilB"),
+      contactLeadA: lead("contactA"),
+      contactLeadB: lead("contactB"),
       health: { coil: health, contact: health },
     };
   }
 
-  const leads = points as [ConnectionPointRef, ConnectionPointRef];
+  const leads: [ConnectionPointRef, ConnectionPointRef] = [
+    lead(leadNames[0]),
+    lead(leadNames[1]),
+  ];
   switch (preset.type) {
     case "resistor":
-      return { id, type: preset.type, params: preset.params, leads, health };
+      return { id, type: preset.type, params: preset.params, position, leads, health };
     case "led":
       return {
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         leadZeroIsPositive: true,
         health,
@@ -145,6 +169,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         leadZeroIsPositive: true,
         health,
@@ -154,6 +179,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         pressed: false,
         health,
@@ -163,30 +189,33 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         wiperPosition: 0.5,
         health,
       };
     case "buzzer":
-      return { id, type: preset.type, params: preset.params, leads, health };
+      return { id, type: preset.type, params: preset.params, position, leads, health };
     case "dcMotor":
-      return { id, type: preset.type, params: preset.params, leads, health };
+      return { id, type: preset.type, params: preset.params, position, leads, health };
     case "ldr":
       return {
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         lightLevel: 0.5,
         health,
       };
     case "batteryHolder":
-      return { id, type: preset.type, params: preset.params, leads, health };
+      return { id, type: preset.type, params: preset.params, position, leads, health };
     case "motionSensor":
       return {
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         motionDetected: false,
         health,
@@ -196,6 +225,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         wetness: 0.5,
         health,
@@ -205,6 +235,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         rainLevel: 0.5,
         health,
@@ -214,6 +245,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         loudness: 0.5,
         health,
@@ -223,6 +255,7 @@ function createComponent(
         id,
         type: preset.type,
         params: preset.params,
+        position,
         leads,
         simulatedTemperatureCelsius: 24,
         simulatedHumidityPercent: 50,
@@ -372,21 +405,12 @@ export function Simulator() {
     });
   }, [result]);
 
+  /** Wiring mode only now — a hole/pin/lead click while `"placingFree"`
+   * doesn't reach here at all; that's the canvas *background* click
+   * (`handleCanvasBackgroundClick`), since placing is a single
+   * click/drop, not a sequence of point clicks (Part 2). */
   function handlePointClick(point: ConnectionPointRef) {
-    if (mode.kind === "idle") return;
-
-    if (mode.kind === "placing") {
-      const preset = PART_PRESETS.find((p) => p.id === mode.presetId);
-      const neededLeads = preset ? presetLeadNames(preset).length : 2;
-      const collectedPoints = [...mode.collectedPoints, point];
-      if (collectedPoints.length < neededLeads) {
-        setMode({ ...mode, collectedPoints });
-        return;
-      }
-      setComponents((prev) => [...prev, createComponent(mode.presetId, collectedPoints)]);
-      setMode({ kind: "idle" });
-      return;
-    }
+    if (mode.kind !== "wiring") return;
 
     if (!mode.firstPoint) {
       setMode({ ...mode, firstPoint: point });
@@ -399,6 +423,41 @@ export function Simulator() {
     setMode({ kind: "idle" });
   }
 
+  /** The canvas background's own click (Part 2) — drops a `"placingFree"`
+   * component at the clicked canvas-space point, or (same as before)
+   * just clears every selection. */
+  function handleCanvasBackgroundClick(canvasPoint: { x: number; y: number }) {
+    if (mode.kind === "placingFree") {
+      setComponents((prev) => [...prev, createComponent(mode.presetId, canvasPoint)]);
+      setMode({ kind: "idle" });
+      return;
+    }
+    setSelectedComponentId(null);
+    setSelectedBoardId(null);
+    setSelectedBreadboardId(null);
+  }
+
+  /** The canvas's native HTML5 drop handler (Part 2) — dragging a
+   * preset/breadboard/board straight from the palette onto the canvas,
+   * the primary placement interaction; `handleCanvasBackgroundClick`'s
+   * `"placingFree"` branch is the click-then-click-canvas fallback for
+   * exactly the same action. */
+  function handleCanvasDrop(payloadJson: string, canvasPoint: { x: number; y: number }) {
+    let payload: PaletteDragPayload;
+    try {
+      payload = JSON.parse(payloadJson) as PaletteDragPayload;
+    } catch {
+      return;
+    }
+    if (payload.kind === "preset") {
+      setComponents((prev) => [...prev, createComponent(payload.presetId, canvasPoint)]);
+    } else if (payload.kind === "breadboard") {
+      handleAddBreadboard(canvasPoint);
+    } else if (payload.kind === "board") {
+      handleAddBoard(payload.boardType, canvasPoint);
+    }
+  }
+
   function handleBreadboardPositionChange(
     id: string,
     position: { x: number; y: number }
@@ -406,8 +465,42 @@ export function Simulator() {
     setBreadboards((prev) => prev.map((bb) => (bb.id === id ? { ...bb, position } : bb)));
   }
 
+  function handleComponentPositionChange(id: string, position: { x: number; y: number }) {
+    setComponents((prev) => prev.map((c) => (c.id === id ? { ...c, position } : c)));
+  }
+
+  function handleAddBreadboard(position?: { x: number; y: number }) {
+    const id = `bb-${nextId++}`;
+    setBreadboards((prev) => [
+      ...prev,
+      {
+        id,
+        position: position ?? { x: 60 + prev.length * 40, y: 60 + prev.length * 40 },
+        columns: BREADBOARD_COLUMNS,
+        pixelWidth: 720,
+        pixelHeight: 360,
+      },
+    ]);
+  }
+
+  function handleRemoveBreadboard(id: string) {
+    setBreadboards((prev) => prev.filter((bb) => bb.id !== id));
+    if (selectedBreadboardId === id) setSelectedBreadboardId(null);
+  }
+
+  function handleRemoveWire(id: string) {
+    setWires((prev) => prev.filter((w) => w.id !== id));
+  }
+
   function handleRemove(id: string) {
     setComponents((prev) => prev.filter((c) => c.id !== id));
+    setWires((prev) =>
+      prev.filter(
+        (w) =>
+          !(w.from.kind === "componentLead" && w.from.componentItemId === id) &&
+          !(w.to.kind === "componentLead" && w.to.componentItemId === id)
+      )
+    );
     if (selectedComponentId === id) setSelectedComponentId(null);
   }
 
@@ -486,9 +579,11 @@ export function Simulator() {
     setSelectedComponentId(null);
   }
 
-  function handleAddBoard(boardType: PlacedBoard["boardType"]) {
+  function handleAddBoard(
+    boardType: PlacedBoard["boardType"],
+    position: { x: number; y: number } = { x: 800, y: 60 + boards.length * 60 }
+  ) {
     const id = `${boardType}-${nextId++}`;
-    const position = { x: 800, y: 60 + boards.length * 60 };
     const board: PlacedBoard =
       boardType === "arduinoUno"
         ? { id, boardType, position, program: "blink", running: false }
@@ -674,11 +769,7 @@ export function Simulator() {
   }
 
   const pendingPoints: ConnectionPointRef[] =
-    mode.kind === "placing"
-      ? mode.collectedPoints
-      : mode.kind === "wiring" && mode.firstPoint
-        ? [mode.firstPoint]
-        : [];
+    mode.kind === "wiring" && mode.firstPoint ? [mode.firstPoint] : [];
 
   const selectedComponent = components.find((c) => c.id === selectedComponentId) ?? null;
 
@@ -766,41 +857,33 @@ export function Simulator() {
         <div className="flex flex-1 overflow-hidden">
           <PartsPalette
             mode={mode}
-            onStartPlacing={(presetId) =>
-              setMode({ kind: "placing", presetId, collectedPoints: [] })
-            }
+            onStartPlacing={(presetId) => setMode({ kind: "placingFree", presetId })}
             onStartWiring={() => setMode({ kind: "wiring" })}
             onCancel={() => setMode({ kind: "idle" })}
             onAddBoard={handleAddBoard}
+            onAddBreadboard={() => handleAddBreadboard()}
           />
 
           <div className="flex-1">
             <CanvasSurface
               viewport={viewport}
               onViewportChange={setViewport}
-              onBackgroundClick={() => {
-                setSelectedComponentId(null);
-                setSelectedBoardId(null);
-                setSelectedBreadboardId(null);
-              }}
+              onBackgroundClick={handleCanvasBackgroundClick}
+              onDropPayload={handleCanvasDrop}
             >
+              <GlobalWireLayer
+                wires={wires}
+                entities={{ breadboards, boards, components }}
+                onRemoveWire={handleRemoveWire}
+              />
               {breadboards.map((bb) => (
                 <BreadboardGlyph
                   key={bb.id}
                   breadboard={bb}
-                  components={components}
-                  wires={wires}
-                  componentResults={result.componentResults}
                   pendingPoints={pendingPoints}
-                  selectedComponentId={selectedComponentId}
                   isSelected={selectedBreadboardId === bb.id}
                   viewportScale={viewport.scale}
                   onHoleClick={handlePointClick}
-                  onComponentClick={(id) => {
-                    setSelectedComponentId(id);
-                    setSelectedBoardId(null);
-                    setSelectedBreadboardId(null);
-                  }}
                   onPositionChange={handleBreadboardPositionChange}
                   onSelect={(id) => {
                     setSelectedBreadboardId(id);
@@ -830,6 +913,30 @@ export function Simulator() {
                     setSelectedBreadboardId(null);
                   }}
                   onPositionChange={handleBoardPositionChange}
+                />
+              ))}
+              {components.map((component) => (
+                <ComponentGlyph
+                  key={component.id}
+                  component={component}
+                  result={result.componentResults.get(component.id)}
+                  isSelected={selectedComponentId === component.id}
+                  isPending={(leadName) =>
+                    pendingPoints.some(
+                      (p) =>
+                        p.kind === "componentLead" &&
+                        p.componentItemId === component.id &&
+                        p.leadName === leadName
+                    )
+                  }
+                  viewportScale={viewport.scale}
+                  onSelect={(id) => {
+                    setSelectedComponentId(id);
+                    setSelectedBoardId(null);
+                    setSelectedBreadboardId(null);
+                  }}
+                  onLeadClick={handlePointClick}
+                  onPositionChange={handleComponentPositionChange}
                 />
               ))}
             </CanvasSurface>

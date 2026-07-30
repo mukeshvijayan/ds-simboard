@@ -23,6 +23,16 @@ export const BOARD_LABELS: Record<BoardType, string> = {
   esp32: "ESP32 Dev Board",
 };
 
+/** A board's rendered pixel footprint on the canvas — shared between
+ * `BoardGlyph.tsx` (which sizes its container to this) and
+ * `model/canvasPositions.ts` (which needs it to convert a board pin's
+ * percentage position into an absolute canvas pixel position for the
+ * global wire layer, Part 2). */
+export const BOARD_PIXEL_SIZE: Record<BoardType, { width: number; height: number }> = {
+  arduinoUno: { width: 320, height: 200 },
+  esp32: { width: 220, height: 300 },
+};
+
 /** Every digital pin's Arduino-style number/name a board exposes —
  * matches `lib/simulation/boards.ts`'s existing `BOARDS` table so the
  * kept board SVGs and this canvas layer agree on what pins exist. */

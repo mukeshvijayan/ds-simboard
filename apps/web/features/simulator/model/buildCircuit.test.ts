@@ -36,6 +36,7 @@ describe("buildCircuit — empty and no-power states", () => {
     const component: PlacedComponent = {
       id: "r1",
       type: "resistor",
+      position: { x: 0, y: 0 },
       params: resistorParams,
       leads: [
         { kind: "componentLead", componentItemId: "r1", leadName: "a" },
@@ -63,6 +64,7 @@ describe("buildCircuit — a single breadboard", () => {
     const component: PlacedComponent = {
       id: "r1",
       type: "resistor",
+      position: { x: 0, y: 0 },
       params: resistorParams,
       leads: [
         {
@@ -94,6 +96,7 @@ describe("buildCircuit — a single breadboard", () => {
     const component: PlacedComponent = {
       id: "r1",
       type: "resistor",
+      position: { x: 0, y: 0 },
       params: resistorParams,
       leads: [
         { kind: "componentLead", componentItemId: "r1", leadName: "a" },
@@ -199,6 +202,7 @@ describe("buildCircuit — multi-lead components (P2-2)", () => {
     const rgbLed: PlacedComponent = {
       id: "rgb1",
       type: "rgbLed",
+      position: { x: 0, y: 0 },
       params: {
         commonTerminal: "cathode",
         red: ledParams,
@@ -246,6 +250,7 @@ describe("buildCircuit — multi-lead components (P2-2)", () => {
     const rgbLed: PlacedComponent = {
       id: "rgb1",
       type: "rgbLed",
+      position: { x: 0, y: 0 },
       params: {
         commonTerminal: "anode",
         red: ledParams,
@@ -335,6 +340,7 @@ describe("buildCircuit — multi-lead components (P2-2)", () => {
     const display: PlacedComponent = {
       id: "seg1",
       type: "sevenSegmentDisplay",
+      position: { x: 0, y: 0 },
       params: { commonTerminal: "cathode", segment: ledParams },
       commonLead: {
         kind: "breadboardHole",
@@ -384,6 +390,7 @@ describe("buildCircuit — transistor and relay two graph elements (P2-2 part 2,
     const component: PlacedComponent = {
       id: "q1",
       type: "transistor",
+      position: { x: 0, y: 0 },
       params: transistorParams,
       baseLead: {
         kind: "breadboardHole",
@@ -421,6 +428,7 @@ describe("buildCircuit — transistor and relay two graph elements (P2-2 part 2,
     const component: PlacedComponent = {
       id: "k1",
       type: "relay",
+      position: { x: 0, y: 0 },
       params: relayParams,
       coilLeadA: {
         kind: "breadboardHole",

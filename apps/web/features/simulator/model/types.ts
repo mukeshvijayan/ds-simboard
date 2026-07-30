@@ -51,6 +51,13 @@ export type BreadboardComponentType =
 
 interface BaseComponent {
   id: string;
+  /** Where this component sits on the open canvas (Part 2, docs/
+   * architecture/0036-*.md) — independent of what, if anything, its
+   * leads are wired to. A freshly-placed component's own leads default
+   * to `{kind: "componentLead", componentItemId: this.id, ...}`
+   * (pointing at itself — unwired) until the user draws a wire from one
+   * to a hole, a board pin, or another component's lead. */
+  position: { x: number; y: number };
   /** The two connection points this component's leads resolve to —
    * breadboard holes, bare canvas points, or (P2-3) board pins, in any
    * combination. */
@@ -167,6 +174,7 @@ export interface PlacedRgbLed {
   id: string;
   type: "rgbLed";
   params: RgbLedParams;
+  position: { x: number; y: number };
   commonLead: ConnectionPointRef;
   redLead: ConnectionPointRef;
   greenLead: ConnectionPointRef;
@@ -198,6 +206,7 @@ export interface PlacedSevenSegmentDisplay {
   id: string;
   type: "sevenSegmentDisplay";
   params: SevenSegmentParams;
+  position: { x: number; y: number };
   commonLead: ConnectionPointRef;
   segmentLeads: Record<SevenSegmentName, ConnectionPointRef>;
   health: Record<SevenSegmentName, HealthState>;
@@ -216,6 +225,7 @@ export interface PlacedTransistor {
   id: string;
   type: "transistor";
   params: TransistorParams;
+  position: { x: number; y: number };
   baseLead: ConnectionPointRef;
   collectorLead: ConnectionPointRef;
   emitterLead: ConnectionPointRef;
@@ -226,6 +236,7 @@ export interface PlacedRelay {
   id: string;
   type: "relay";
   params: RelayParams;
+  position: { x: number; y: number };
   coilLeadA: ConnectionPointRef;
   coilLeadB: ConnectionPointRef;
   /** Common/pole terminal. */

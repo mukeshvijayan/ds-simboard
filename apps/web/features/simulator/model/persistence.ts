@@ -6,7 +6,16 @@ import type {
   PlacedComponent,
 } from "./types";
 
-export const CANVAS_SNAPSHOT_VERSION = 1;
+/** Bumped to 2 for Part 2's free-floating-component architecture
+ * (docs/architecture/0036-*.md): a `PlacedComponent` now has its own
+ * `position` and self-referencing leads instead of being defined by
+ * which breadboard holes it was placed into — a version-1 snapshot's
+ * components are missing both, so loading one under the version-2 model
+ * without a real migration would render broken (undefined position)
+ * rather than fail clearly. Pre-launch, actively-developed software with
+ * no real saved user data to migrate, so a clean "unsupported version"
+ * error is the honest choice over a silent, confusing partial load. */
+export const CANVAS_SNAPSHOT_VERSION = 2;
 
 /**
  * Everything the unified canvas needs to fully restore itself — the

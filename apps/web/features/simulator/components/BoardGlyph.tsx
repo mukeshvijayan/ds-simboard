@@ -1,19 +1,11 @@
 "use client";
 
-import { useRef } from "react";
 import { ArduinoUno } from "@/components/simulator/boards/ArduinoUno";
 import { ESP32 } from "@/components/simulator/boards/ESP32";
-import { BOARD_LABELS, BOARD_PIN_LAYOUTS } from "../model/boardPins";
+import { BOARD_LABELS, BOARD_PIN_LAYOUTS, BOARD_PIXEL_SIZE } from "../model/boardPins";
+import { useCanvasDrag } from "../model/useCanvasDrag";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import type { PlacedBoard } from "../model/types";
-
-const BOARD_PIXEL_SIZE: Record<
-  PlacedBoard["boardType"],
-  { width: number; height: number }
-> = {
-  arduinoUno: { width: 320, height: 200 },
-  esp32: { width: 220, height: 300 },
-};
 
 /**
  * A board placed on the canvas (P2-3, closing ADR 0027) — a draggable
@@ -40,38 +32,11 @@ export function BoardGlyph({
   onSelect: (id: string) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
 }) {
-  const dragStart = useRef<{
-    clientX: number;
-    clientY: number;
-    position: { x: number; y: number };
-  } | null>(null);
   const { width, height } = BOARD_PIXEL_SIZE[board.boardType];
   const pins = BOARD_PIN_LAYOUTS[board.boardType];
-
-  function handleMouseDown(event: React.MouseEvent) {
-    if (event.target !== event.currentTarget) return;
-    event.stopPropagation();
-    dragStart.current = {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      position: board.position,
-    };
-  }
-
-  function handleMouseMove(event: React.MouseEvent) {
-    if (!dragStart.current) return;
-    event.stopPropagation();
-    const dx = (event.clientX - dragStart.current.clientX) / viewportScale;
-    const dy = (event.clientY - dragStart.current.clientY) / viewportScale;
-    onPositionChange(board.id, {
-      x: dragStart.current.position.x + dx,
-      y: dragStart.current.position.y + dy,
-    });
-  }
-
-  function endDrag() {
-    dragStart.current = null;
-  }
+  const drag = useCanvasDrag(board.position, viewportScale, (position) =>
+    onPositionChange(board.id, position)
+  );
 
   return (
     <div
@@ -81,10 +46,7 @@ export function BoardGlyph({
         isSelected ? "ring-2 ring-navy ring-offset-1" : ""
       }`}
       style={{ left: board.position.x, top: board.position.y, width, height }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={endDrag}
-      onMouseLeave={endDrag}
+      onMouseDown={drag.onMouseDown}
       onClick={() => onSelect(board.id)}
     >
       <div className="pointer-events-none absolute inset-0">

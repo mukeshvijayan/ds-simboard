@@ -46,6 +46,7 @@ function resistor(
   return {
     id,
     type: "resistor",
+    position: { x: 0, y: 0 },
     params: resistorParams,
     leads,
     health: { status: "nominal" },
@@ -60,6 +61,7 @@ function led(
   return {
     id,
     type: "led",
+    position: { x: 0, y: 0 },
     params: ledParams,
     leads,
     leadZeroIsPositive,
@@ -171,6 +173,7 @@ describe("resolveCircuit — short-circuit marks every placed component failed",
       {
         id: "pot1",
         type: "potentiometer",
+        position: { x: 0, y: 0 },
         params: { totalResistanceOhms: 10_000, ratedPowerWatts: 0.2 },
         leads: [positiveRail(), negativeRail()],
         wiperPosition: 0.5,
@@ -207,6 +210,7 @@ describe("resolveCircuit — RGB LED (P2-2, closing ADR 0022)", () => {
       {
         id: "rgb1",
         type: "rgbLed",
+        position: { x: 0, y: 0 },
         params: {
           commonTerminal: "cathode",
           red: channelParams(2.0, "red"),
@@ -245,6 +249,7 @@ describe("resolveCircuit — RGB LED (P2-2, closing ADR 0022)", () => {
       {
         id: "rgb1",
         type: "rgbLed",
+        position: { x: 0, y: 0 },
         params: {
           commonTerminal: "cathode",
           red: channelParams(2.0, "red"),
@@ -292,6 +297,7 @@ describe("resolveCircuit — 7-segment display (P2-2, closing ADR 0022)", () => 
       {
         id: "seg1",
         type: "sevenSegmentDisplay",
+        position: { x: 0, y: 0 },
         params: { commonTerminal: "cathode", segment: segmentParams },
         commonLead: negativeRail(),
         segmentLeads: {
@@ -336,6 +342,7 @@ describe("resolveCircuit — a resistive sensor placed directly on the rails", (
       {
         id: "ldr1",
         type: "ldr",
+        position: { x: 0, y: 0 },
         params: { minResistanceOhms: 500, maxResistanceOhms: 1_000_000 },
         leads: [positiveRail(), negativeRail()],
         lightLevel: 1,
@@ -363,6 +370,7 @@ describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 
       {
         id: "rb",
         type: "resistor",
+        position: { x: 0, y: 0 },
         params: { resistanceOhms: 4700, ratedPowerWatts: 0.25 },
         leads: [positiveRail(), strip("a", 1)],
         health: { status: "nominal" },
@@ -370,6 +378,7 @@ describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 
       {
         id: "q1",
         type: "transistor",
+        position: { x: 0, y: 0 },
         params: transistorParams,
         baseLead: strip("a", 1),
         collectorLead: strip("a", 2),
@@ -403,6 +412,7 @@ describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 
       {
         id: "rb",
         type: "resistor",
+        position: { x: 0, y: 0 },
         params: { resistanceOhms: 4700, ratedPowerWatts: 0.25 },
         leads: [positiveRail(), strip("a", 1)],
         health: { status: "nominal" },
@@ -410,6 +420,7 @@ describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 
       {
         id: "q1",
         type: "transistor",
+        position: { x: 0, y: 0 },
         params: { ...transistorParams, baseThresholdCurrentAmps: 0.01 },
         baseLead: strip("a", 1),
         collectorLead: strip("a", 2),
@@ -440,6 +451,7 @@ describe("resolveCircuit — transistor-as-switch, two-phase resolve (P2-2 part 
       {
         id: "q1",
         type: "transistor",
+        position: { x: 0, y: 0 },
         params: { ...transistorParams, maxCollectorCurrentAmps: 0.001 },
         baseLead: strip("a", 1),
         collectorLead: strip("a", 2),
@@ -477,6 +489,7 @@ describe("resolveCircuit — relay module, two-phase resolve (P2-2 part 2, closi
       {
         id: "k1",
         type: "relay",
+        position: { x: 0, y: 0 },
         params: relayParams,
         coilLeadA: positiveRail(),
         coilLeadB: negativeRail(),
@@ -506,6 +519,7 @@ describe("resolveCircuit — relay module, two-phase resolve (P2-2 part 2, closi
       {
         id: "k1",
         type: "relay",
+        position: { x: 0, y: 0 },
         params: { ...relayParams, pullInCurrentAmps: 1, maxCoilCurrentAmps: 2 },
         coilLeadA: positiveRail(),
         coilLeadB: negativeRail(),
@@ -535,6 +549,7 @@ describe("resolveCircuit — relay module, two-phase resolve (P2-2 part 2, closi
       {
         id: "k1",
         type: "relay",
+        position: { x: 0, y: 0 },
         params: { ...relayParams, pullInCurrentAmps: 0.0005, maxCoilCurrentAmps: 0.001 },
         coilLeadA: positiveRail(),
         coilLeadB: negativeRail(),

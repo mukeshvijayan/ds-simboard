@@ -37,8 +37,8 @@ export function LedGlyph({
   color = "red",
   status,
   brightness = 1,
-  width = 38,
-  height = 68,
+  width = 40,
+  height = 60,
 }: {
   color?: string;
   status: LedVisualStatus;

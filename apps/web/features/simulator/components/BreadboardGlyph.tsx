@@ -1,14 +1,11 @@
 "use client";
 
-import { useRef } from "react";
 import type { HoleAddress, StripRow } from "@ds-simboard/circuit-engine";
-import { holePosition, resolveVisualColumn, type UIHoleRef } from "../model/layout";
-import type { ComponentResult } from "../model/resolveCircuit";
-import { componentGraphElements } from "../model/componentElements";
-import type { CanvasWireModel, PlacedBreadboard, PlacedComponent } from "../model/types";
+import { type UIHoleRef } from "../model/layout";
 import type { ConnectionPointRef } from "../model/connectionPoint";
+import type { PlacedBreadboard } from "../model/types";
+import { useCanvasDrag } from "../model/useCanvasDrag";
 import { Hole } from "./Hole";
-import { ComponentGlyph } from "./ComponentGlyph";
 import { BreadboardArt } from "./glyphs/BreadboardArt";
 
 const STRIP_ROWS_UPPER: StripRow[] = ["a", "b", "c", "d", "e"];
@@ -39,46 +36,42 @@ function holeOf(point: ConnectionPointRef): HoleAddress | null {
 
 /**
  * A single placed breadboard — a draggable canvas item (ADR 0024), not
- * the fixed backdrop it used to be. Everything inside (holes, wires,
- * component glyphs) is positioned in the same percentage-based local
- * space Breadboard Lab already used (`model/layout.ts`, unchanged),
- * just rendered inside a fixed-pixel-size, canvas-positioned container
- * instead of a full-width page element.
+ * the fixed backdrop it used to be. Just the board itself and its
+ * holes now (Part 2, docs/architecture/0036-*.md): components used to
+ * be rendered *inside* this component, in its own local percentage
+ * space, because a component's position was derived from which of this
+ * breadboard's holes its leads were placed into. Now every component is
+ * a free-floating, independently-positioned sibling on the canvas (they
+ * can be wired to holes on *any* breadboard, not just whichever one
+ * they happened to render inside of), so `Simulator.tsx` renders them
+ * at the top level instead, alongside boards and breadboards — and
+ * draws every wire (including a component's own internal lead-to-lead
+ * connection) in one canvas-wide global layer instead of this
+ * breadboard's own local SVG, since a wire now routinely spans between
+ * items this component has no coordinate space in common with.
  */
 export function BreadboardGlyph({
   breadboard,
-  components,
-  wires,
-  componentResults,
   pendingPoints,
-  selectedComponentId,
   isSelected,
   viewportScale,
   onHoleClick,
-  onComponentClick,
   onPositionChange,
   onSelect,
 }: {
   breadboard: PlacedBreadboard;
-  components: PlacedComponent[];
-  wires: CanvasWireModel[];
-  componentResults: Map<string, ComponentResult>;
   pendingPoints: ConnectionPointRef[];
-  selectedComponentId: string | null;
   isSelected: boolean;
   viewportScale: number;
   onHoleClick: (point: ConnectionPointRef) => void;
-  onComponentClick: (id: string) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
   onSelect: (id: string) => void;
 }) {
   const { columns } = breadboard;
   const columnRange = Array.from({ length: columns }, (_, i) => i + 1);
-  const dragStart = useRef<{
-    clientX: number;
-    clientY: number;
-    position: { x: number; y: number };
-  } | null>(null);
+  const drag = useCanvasDrag(breadboard.position, viewportScale, (position) =>
+    onPositionChange(breadboard.id, position)
+  );
 
   const pendingHoleAddresses = pendingPoints
     .map(holeOf)
@@ -90,41 +83,8 @@ export function BreadboardGlyph({
     return { kind: "breadboardHole", boardItemId: breadboard.id, hole: uiHole.address };
   }
 
-  const lineFor = (a: HoleAddress, b: HoleAddress) => {
-    const colA = resolveVisualColumn(a, b);
-    const colB = resolveVisualColumn(b, a);
-    const posA = holePosition({ address: a, visualColumn: colA }, columns);
-    const posB = holePosition({ address: b, visualColumn: colB }, columns);
-    return { x1: posA.xPercent, y1: posA.yPercent, x2: posB.xPercent, y2: posB.yPercent };
-  };
-
-  function handleMouseDown(event: React.MouseEvent) {
-    if (event.target !== event.currentTarget) return; // a hole/component handles its own click
-    event.stopPropagation(); // don't also start panning the whole canvas
-    dragStart.current = {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      position: breadboard.position,
-    };
-  }
-
-  function handleMouseMove(event: React.MouseEvent) {
-    if (!dragStart.current) return;
-    event.stopPropagation();
-    const dx = (event.clientX - dragStart.current.clientX) / viewportScale;
-    const dy = (event.clientY - dragStart.current.clientY) / viewportScale;
-    onPositionChange(breadboard.id, {
-      x: dragStart.current.position.x + dx,
-      y: dragStart.current.position.y + dy,
-    });
-  }
-
-  function endDrag() {
-    dragStart.current = null;
-  }
-
   function handleClick(event: React.MouseEvent) {
-    if (event.target !== event.currentTarget) return; // a hole/component handles its own click
+    if (event.target !== event.currentTarget) return; // a hole handles its own click
     onSelect(breadboard.id);
   }
 
@@ -141,56 +101,10 @@ export function BreadboardGlyph({
         width: breadboard.pixelWidth,
         height: breadboard.pixelHeight,
       }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={endDrag}
-      onMouseLeave={endDrag}
+      onMouseDown={drag.onMouseDown}
       onClick={handleClick}
     >
       <BreadboardArt columns={columns} />
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {wires.map((wire) => {
-          const from = holeOf(wire.from);
-          const to = holeOf(wire.to);
-          if (!from || !to) return null;
-          const { x1, y1, x2, y2 } = lineFor(from, to);
-          return (
-            <line
-              key={wire.id}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="#22314F"
-              strokeWidth={0.4}
-            />
-          );
-        })}
-        {components.flatMap((component) =>
-          componentGraphElements(component).map((element) => {
-            const from = holeOf(element.nodeA);
-            const to = holeOf(element.nodeB);
-            if (!from || !to) return null;
-            const { x1, y1, x2, y2 } = lineFor(from, to);
-            return (
-              <line
-                key={element.elementId}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke="rgba(28,27,24,0.35)"
-                strokeWidth={0.3}
-              />
-            );
-          })
-        )}
-      </svg>
 
       {columnRange.map((c) => (
         <Hole
@@ -232,17 +146,6 @@ export function BreadboardGlyph({
           />
         ))
       )}
-
-      {components.map((component) => (
-        <ComponentGlyph
-          key={component.id}
-          component={component}
-          result={componentResults.get(component.id)}
-          columns={columns}
-          isSelected={selectedComponentId === component.id}
-          onSelect={onComponentClick}
-        />
-      ))}
     </div>
   );
 }

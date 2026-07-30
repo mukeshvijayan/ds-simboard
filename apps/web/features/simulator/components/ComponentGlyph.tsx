@@ -1,10 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { HoleAddress } from "@ds-simboard/circuit-engine";
-import { holePosition, resolveVisualColumn } from "../model/layout";
 import { overallHealthStatus, type ComponentResult } from "../model/resolveCircuit";
-import { componentLeadPoints } from "../model/componentElements";
+import {
+  COMPONENT_BOX_SIZE,
+  COMPONENT_LEAD_NAMES,
+  componentPinPercent,
+} from "../model/componentPinLayouts";
+import { useCanvasDrag } from "../model/useCanvasDrag";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import { SEVEN_SEGMENT_NAMES, type PlacedComponent } from "../model/types";
 import { PART_LABELS } from "../constants";
@@ -22,13 +25,6 @@ import { Dht11Glyph } from "./glyphs/Dht11Glyph";
 import { RgbLedGlyph } from "./glyphs/RgbLedGlyph";
 import { SevenSegmentGlyph } from "./glyphs/SevenSegmentGlyph";
 import { RelayGlyph } from "./glyphs/RelayGlyph";
-
-/** This canvas slice only renders components whose leads are breadboard
- * holes (P2-1's scope, per ADR 0024) — bare/freestanding leads get their
- * own glyph rendering once P2-3 needs it. */
-function holeOf(point: ConnectionPointRef): HoleAddress | null {
-  return point.kind === "breadboardHole" ? point.hole : null;
-}
 
 /** Only the few types not yet given hand-authored SVG artwork fall
  * through to this plain colored-box glyph (buzzer, DC motor, LDR,
@@ -60,155 +56,189 @@ function glyphColor(
   return "#3B4C70";
 }
 
+/**
+ * A free-floating placed component (Part 2, docs/architecture/
+ * 0036-*.md) — positioned at its own `component.position`, independent
+ * of whatever its leads are (or aren't) wired to, the same
+ * draggable-canvas-item pattern `BoardGlyph`/`BreadboardGlyph` already
+ * use. Each lead renders as its own small clickable point (via
+ * `model/componentPinLayouts.ts`'s per-type registry) so `onLeadClick`
+ * can be wired to the same generic wiring-mode handler every other
+ * connection point already uses — a component's lead is just one more
+ * kind of `ConnectionPointRef`, not a special case.
+ */
 export function ComponentGlyph({
   component,
   result,
-  columns,
   isSelected,
+  isPending,
+  viewportScale,
   onSelect,
+  onLeadClick,
+  onPositionChange,
 }: {
   component: PlacedComponent;
   result: ComponentResult | undefined;
-  columns: number;
   isSelected: boolean;
+  isPending: (leadName: string) => boolean;
+  viewportScale: number;
   onSelect: (id: string) => void;
+  onLeadClick: (point: ConnectionPointRef) => void;
+  onPositionChange: (id: string, position: { x: number; y: number }) => void;
 }) {
-  const holes = componentLeadPoints(component)
-    .map(holeOf)
-    .filter((hole): hole is HoleAddress => hole !== null);
-  const others = holes.slice(1);
-  const positions = holes.map((hole, index) => {
-    const other = others[index] ?? others[0] ?? hole;
-    const col = resolveVisualColumn(hole, other);
-    return holePosition({ address: hole, visualColumn: col }, columns);
-  });
-  const midX = positions.reduce((sum, p) => sum + p.xPercent, 0) / positions.length;
-  const midY = positions.reduce((sum, p) => sum + p.yPercent, 0) / positions.length;
   const status = result ? overallHealthStatus(result.health) : "nominal";
   const failed = status === "failed";
-
-  // Hand-authored SVG artwork (P2-4b pilot + rollout, ADR 0032/0033) —
-  // every type handled below renders its own original glyph; the few
-  // types not yet covered keep the plain generic colored-box glyph at
-  // the bottom of this function.
-  const wrap = (children: ReactNode) => (
-    <button
-      type="button"
-      onClick={() => onSelect(component.id)}
-      aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-sm transition-transform hover:scale-105 ${
-        isSelected ? "ring-2 ring-navy ring-offset-1" : ""
-      }`}
-      style={{ left: `${midX}%`, top: `${midY}%` }}
-    >
-      {children}
-    </button>
+  const box = COMPONENT_BOX_SIZE[component.type];
+  const leadNames = COMPONENT_LEAD_NAMES[component.type];
+  const drag = useCanvasDrag(component.position, viewportScale, (position) =>
+    onPositionChange(component.id, position)
   );
 
-  if (component.type === "led") {
-    const brightness = (result?.visual as { brightness?: number })?.brightness ?? 0;
-    const ledStatus: LedVisualStatus = failed ? "burned" : brightness > 0 ? "lit" : "off";
-    return wrap(
-      <LedGlyph
-        color={component.params.color}
-        status={ledStatus}
-        brightness={brightness}
-      />
+  const glyph = (() => {
+    if (component.type === "led") {
+      const brightness = (result?.visual as { brightness?: number })?.brightness ?? 0;
+      const ledStatus: LedVisualStatus = failed
+        ? "burned"
+        : brightness > 0
+          ? "lit"
+          : "off";
+      return (
+        <LedGlyph
+          color={component.params.color}
+          status={ledStatus}
+          brightness={brightness}
+        />
+      );
+    }
+    if (component.type === "resistor") {
+      return <ResistorGlyph resistanceOhms={component.params.resistanceOhms} />;
+    }
+    if (component.type === "diode") {
+      return <DiodeGlyph failed={failed} />;
+    }
+    if (component.type === "transistor") {
+      const isOn = (result?.visual as { isOn?: boolean })?.isOn ?? false;
+      return <TransistorGlyph isOn={isOn} />;
+    }
+    if (component.type === "pushbutton") {
+      return (
+        <PushbuttonGlyph
+          pressed={component.pressed}
+          isMomentary={component.params.isMomentary}
+        />
+      );
+    }
+    if (component.type === "potentiometer") {
+      return <PotentiometerGlyph wiperPosition={component.wiperPosition} />;
+    }
+    if (component.type === "motionSensor") {
+      return <PirGlyph motionDetected={component.motionDetected} />;
+    }
+    if (component.type === "soilMoistureSensor") {
+      return <SoilMoistureGlyph wetness={component.wetness} />;
+    }
+    if (component.type === "rainSensor") {
+      return <RainSensorGlyph rainLevel={component.rainLevel} />;
+    }
+    if (component.type === "soundSensor") {
+      return <SoundSensorGlyph loudness={component.loudness} />;
+    }
+    if (component.type === "dht11") {
+      return (
+        <Dht11Glyph
+          temperatureCelsius={component.simulatedTemperatureCelsius}
+          humidityPercent={component.simulatedHumidityPercent}
+        />
+      );
+    }
+    if (component.type === "rgbLed") {
+      const visual = result?.visual as
+        | {
+            red: { visual: { brightness: number } };
+            green: { visual: { brightness: number } };
+            blue: { visual: { brightness: number } };
+          }
+        | undefined;
+      const r = Math.round((visual?.red.visual.brightness ?? 0) * 255);
+      const g = Math.round((visual?.green.visual.brightness ?? 0) * 255);
+      const b = Math.round((visual?.blue.visual.brightness ?? 0) * 255);
+      const anyLit = r + g + b > 0;
+      return (
+        <RgbLedGlyph
+          mixedColor={anyLit ? `rgb(${r}, ${g}, ${b})` : "#A7A59D"}
+          anyLit={anyLit}
+        />
+      );
+    }
+    if (component.type === "sevenSegmentDisplay") {
+      const visual = result?.visual as
+        { segments: Record<string, { visual: { brightness: number } }> } | undefined;
+      const isLit = (name: string) =>
+        (visual?.segments[name]?.visual.brightness ?? 0) > 0;
+      const segments = Object.fromEntries(
+        SEVEN_SEGMENT_NAMES.filter((n) => n !== "dp").map((n) => [n, isLit(n)])
+      ) as Record<"a" | "b" | "c" | "d" | "e" | "f" | "g", boolean>;
+      return <SevenSegmentGlyph segments={segments} decimalPointLit={isLit("dp")} />;
+    }
+    if (component.type === "relay") {
+      const isClosed =
+        (result?.visual as { contact: { visual: { isClosed: boolean } } })?.contact.visual
+          .isClosed ?? false;
+      return <RelayGlyph contactClosed={isClosed} />;
+    }
+    const color = glyphColor(component, result);
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center rounded-sm border px-1 text-[9px] font-medium text-ivory shadow-sm"
+        style={{ backgroundColor: color, borderColor: "rgba(28,27,24,0.3)" }}
+      >
+        {PART_LABELS[component.type]}
+      </div>
     );
-  }
-  if (component.type === "resistor") {
-    return wrap(<ResistorGlyph resistanceOhms={component.params.resistanceOhms} />);
-  }
-  if (component.type === "diode") {
-    return wrap(<DiodeGlyph failed={failed} />);
-  }
-  if (component.type === "transistor") {
-    const isOn = (result?.visual as { isOn?: boolean })?.isOn ?? false;
-    return wrap(<TransistorGlyph isOn={isOn} />);
-  }
-  if (component.type === "pushbutton") {
-    return wrap(
-      <PushbuttonGlyph
-        pressed={component.pressed}
-        isMomentary={component.params.isMomentary}
-      />
-    );
-  }
-  if (component.type === "potentiometer") {
-    return wrap(<PotentiometerGlyph wiperPosition={component.wiperPosition} />);
-  }
-  if (component.type === "motionSensor") {
-    return wrap(<PirGlyph motionDetected={component.motionDetected} />);
-  }
-  if (component.type === "soilMoistureSensor") {
-    return wrap(<SoilMoistureGlyph wetness={component.wetness} />);
-  }
-  if (component.type === "rainSensor") {
-    return wrap(<RainSensorGlyph rainLevel={component.rainLevel} />);
-  }
-  if (component.type === "soundSensor") {
-    return wrap(<SoundSensorGlyph loudness={component.loudness} />);
-  }
-  if (component.type === "dht11") {
-    return wrap(
-      <Dht11Glyph
-        temperatureCelsius={component.simulatedTemperatureCelsius}
-        humidityPercent={component.simulatedHumidityPercent}
-      />
-    );
-  }
-  if (component.type === "rgbLed") {
-    const visual = result?.visual as
-      | {
-          red: { visual: { brightness: number } };
-          green: { visual: { brightness: number } };
-          blue: { visual: { brightness: number } };
-        }
-      | undefined;
-    const r = Math.round((visual?.red.visual.brightness ?? 0) * 255);
-    const g = Math.round((visual?.green.visual.brightness ?? 0) * 255);
-    const b = Math.round((visual?.blue.visual.brightness ?? 0) * 255);
-    const anyLit = r + g + b > 0;
-    return wrap(
-      <RgbLedGlyph
-        mixedColor={anyLit ? `rgb(${r}, ${g}, ${b})` : "#A7A59D"}
-        anyLit={anyLit}
-      />
-    );
-  }
-  if (component.type === "sevenSegmentDisplay") {
-    const visual = result?.visual as
-      { segments: Record<string, { visual: { brightness: number } }> } | undefined;
-    const isLit = (name: string) => (visual?.segments[name]?.visual.brightness ?? 0) > 0;
-    const segments = Object.fromEntries(
-      SEVEN_SEGMENT_NAMES.filter((n) => n !== "dp").map((n) => [n, isLit(n)])
-    ) as Record<"a" | "b" | "c" | "d" | "e" | "f" | "g", boolean>;
-    return wrap(<SevenSegmentGlyph segments={segments} decimalPointLit={isLit("dp")} />);
-  }
-  if (component.type === "relay") {
-    const isClosed =
-      (result?.visual as { contact: { visual: { isClosed: boolean } } })?.contact.visual
-        .isClosed ?? false;
-    return wrap(<RelayGlyph contactClosed={isClosed} />);
-  }
+  })();
 
-  const color = glyphColor(component, result);
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(component.id)}
-      aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""}`}
-      className={`absolute flex h-6 min-w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-sm border px-1 text-[9px] font-medium text-ivory shadow-sm transition-transform hover:scale-105 ${
+    <div
+      role="group"
+      aria-label={`${PART_LABELS[component.type]} ${component.id}${failed ? ", failed" : ""} — drag to move`}
+      className={`absolute cursor-grab rounded-sm active:cursor-grabbing ${
         isSelected ? "ring-2 ring-navy ring-offset-1" : ""
       }`}
       style={{
-        left: `${midX}%`,
-        top: `${midY}%`,
-        backgroundColor: color,
-        borderColor: "rgba(28,27,24,0.3)",
+        left: component.position.x,
+        top: component.position.y,
+        width: box.width,
+        height: box.height,
       }}
+      onMouseDown={drag.onMouseDown}
+      onClick={() => onSelect(component.id)}
     >
-      {PART_LABELS[component.type]}
-    </button>
+      <div className="pointer-events-none absolute inset-0">{glyph as ReactNode}</div>
+      {leadNames.map((leadName) => {
+        const percent = componentPinPercent(component.type, leadName);
+        const pending = isPending(leadName);
+        return (
+          <button
+            key={leadName}
+            type="button"
+            aria-label={`${PART_LABELS[component.type]} ${component.id} ${leadName} lead`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onLeadClick({
+                kind: "componentLead",
+                componentItemId: component.id,
+                leadName,
+              });
+            }}
+            className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border transition-colors focus-visible:z-10 ${
+              pending
+                ? "border-navy bg-navy ring-2 ring-navy ring-offset-1"
+                : "border-charcoal/40 bg-white/80 hover:border-navy hover:bg-navy/10"
+            }`}
+            style={{ left: `${percent.xPercent}%`, top: `${percent.yPercent}%` }}
+          />
+        );
+      })}
+    </div>
   );
 }

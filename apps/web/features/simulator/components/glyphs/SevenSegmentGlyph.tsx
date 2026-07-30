@@ -14,16 +14,23 @@
  * way — the shared common leg — gets an explicit label.
  */
 
+/** Nine clickable wiring points along the bottom edge, within this
+ * glyph's actual 0-40-wide viewBox (fixed from an earlier placeholder
+ * version whose x values ran past the real edge — harmless while
+ * unused, but these are now real wiring-point positions, so they need
+ * to actually fit). No individual lead-line stub is drawn per pin (a
+ * plain dot, same as a board pin) — only the shared "COM" leg gets a
+ * drawn label, per this file's labeling note above. */
 export const SEVEN_SEGMENT_PIN_POSITIONS = {
-  common: { x: 2, y: 60 },
-  a: { x: 10, y: 60 },
-  b: { x: 16, y: 60 },
-  c: { x: 22, y: 60 },
-  d: { x: 28, y: 60 },
-  e: { x: 34, y: 60 },
-  f: { x: 40, y: 60 },
-  g: { x: 46, y: 60 },
-  dp: { x: 52, y: 60 },
+  common: { x: 2, y: 66 },
+  a: { x: 6, y: 66 },
+  b: { x: 11, y: 66 },
+  c: { x: 15, y: 66 },
+  d: { x: 20, y: 66 },
+  e: { x: 24, y: 66 },
+  f: { x: 29, y: 66 },
+  g: { x: 33, y: 66 },
+  dp: { x: 38, y: 66 },
 };
 
 const LIT_COLOR = "#D64545";
@@ -32,7 +39,7 @@ const UNLIT_COLOR = "#A7A59D";
 export function SevenSegmentGlyph({
   segments,
   decimalPointLit,
-  width = 34,
+  width = 40,
   height = 68,
 }: {
   segments: Record<"a" | "b" | "c" | "d" | "e" | "f" | "g", boolean>;
