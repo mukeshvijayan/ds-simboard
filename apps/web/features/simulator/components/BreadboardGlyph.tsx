@@ -1,7 +1,7 @@
 "use client";
 
 import type { HoleAddress, StripRow } from "@ds-simboard/circuit-engine";
-import { type UIHoleRef } from "../model/layout";
+import { holePosition, type UIHoleRef } from "../model/layout";
 import type { ConnectionPointRef } from "../model/connectionPoint";
 import type { PlacedBreadboard } from "../model/types";
 import { useCanvasDrag } from "../model/useCanvasDrag";
@@ -105,6 +105,29 @@ export function BreadboardGlyph({
       onClick={handleClick}
     >
       <BreadboardArt columns={columns} />
+
+      {/* Rail labels — a real breadboard's own printed "+"/"−" stripe
+       * legend, matching the tinted rail holes above (Part 2 polish). */}
+      <div
+        className="pointer-events-none absolute font-mono text-[10px] text-[#b23b3b]"
+        style={{
+          left: "-2%",
+          top: `${holePosition(railHole("top-positive", 1), columns).yPercent}%`,
+          transform: "translate(-100%, -50%)",
+        }}
+      >
+        +5V
+      </div>
+      <div
+        className="pointer-events-none absolute font-mono text-[10px] text-charcoal"
+        style={{
+          left: "-2%",
+          top: `${holePosition(railHole("top-negative", 1), columns).yPercent}%`,
+          transform: "translate(-100%, -50%)",
+        }}
+      >
+        GND
+      </div>
 
       {columnRange.map((c) => (
         <Hole
