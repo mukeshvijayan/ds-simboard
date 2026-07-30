@@ -23,9 +23,31 @@ test.use({ viewport: { width: 1600, height: 1000 } });
  * the click-then-click-canvas placement fallback (the primary
  * interaction is a native HTML5 drag from the palette, which these
  * tests don't need to exercise separately since both paths call the
- * same placement code). */
+ * same placement code). Only works for a group's *default* (first)
+ * variant — a resistor's 220Ω, an LED's red, etc.; a non-default
+ * variant needs `placeGroupVariant` instead (Part 2's palette
+ * grouping, ADR 0036, shows one button per *type*, not per variant). */
 async function placeFree(page: Page, presetLabel: string, x: number, y: number) {
   await page.getByRole("button", { name: presetLabel, exact: true }).click();
+  await page.mouse.click(x, y);
+}
+
+/** Places a *non-default* variant of a grouped preset — picks it from
+ * the group's own dropdown first (which also re-labels the group's
+ * main button to match), then places exactly like `placeFree`. */
+async function placeGroupVariant(
+  page: Page,
+  groupSelectLabel: string,
+  variantOptionLabel: string,
+  x: number,
+  y: number
+) {
+  await page
+    .getByRole("combobox", { name: groupSelectLabel, exact: true })
+    .selectOption({ label: variantOptionLabel });
+  await page
+    .getByRole("button", { name: new RegExp(`\\(${variantOptionLabel}\\)$`) })
+    .click();
   await page.mouse.click(x, y);
 }
 
@@ -205,7 +227,7 @@ test.describe("Simulator", () => {
     // emitter branch conducts in a real second solve.
     await placeFree(page, "Transistor (NPN Switch)", 1150, 150);
     await placeFree(page, "Resistor (220Ω)", 1350, 150);
-    await placeFree(page, "Resistor (330Ω)", 1150, 300);
+    await placeGroupVariant(page, "Resistor variant", "330Ω", 1150, 300);
     await placeFree(page, "LED (Red)", 1350, 300);
 
     // Both resistor presets share the same "resistor-" id prefix

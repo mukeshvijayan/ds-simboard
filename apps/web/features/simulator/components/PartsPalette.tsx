@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { PART_PRESETS } from "../constants";
+import {
+  PART_PRESETS,
+  PART_GROUP_LABELS,
+  presetShortLabel,
+  type PartPreset,
+} from "../constants";
 import {
   BOARD_TIER,
   COMPONENT_TIER,
@@ -11,10 +16,30 @@ import {
   type GradeTier,
 } from "../model/gradeTiers";
 import type { InteractionMode } from "../model/interactionMode";
-import type { PlacedBoard } from "../model/types";
+import type { BreadboardComponentType, PlacedBoard } from "../model/types";
 import type { PaletteDragPayload } from "../model/dragPayload";
 
 type TierFilter = GradeTier | "all";
+
+/** One palette entry per `BreadboardComponentType` present in
+ * `visiblePresets`, in first-encountered order — a type with more than
+ * one preset (and a `PART_GROUP_LABELS` entry) becomes one button plus
+ * a variant dropdown (Part 2); a type with exactly one preset stays a
+ * single plain button, unchanged from before grouping existed. */
+function groupPresets(
+  presets: PartPreset[]
+): { type: BreadboardComponentType; variants: PartPreset[] }[] {
+  const order: BreadboardComponentType[] = [];
+  const byType = new Map<BreadboardComponentType, PartPreset[]>();
+  for (const preset of presets) {
+    if (!byType.has(preset.type)) {
+      byType.set(preset.type, []);
+      order.push(preset.type);
+    }
+    byType.get(preset.type)!.push(preset);
+  }
+  return order.map((type) => ({ type, variants: byType.get(type)! }));
+}
 
 export function PartsPalette({
   mode,
@@ -35,10 +60,17 @@ export function PartsPalette({
   // what's *offered* for new placement, it never hides or disables an
   // already-placed part regardless of which filter is active.
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  // Which variant a multi-preset group's dropdown currently shows —
+  // keyed by type, defaulting to that group's first preset until the
+  // user picks a different one.
+  const [selectedVariant, setSelectedVariant] = useState<
+    Partial<Record<BreadboardComponentType, string>>
+  >({});
 
   const visiblePresets = PART_PRESETS.filter(
     (preset) => tierFilter === "all" || COMPONENT_TIER[preset.type] === tierFilter
   );
+  const groups = groupPresets(visiblePresets);
   const showArduinoUno = tierFilter === "all" || BOARD_TIER.arduinoUno === tierFilter;
   const showEsp32 = tierFilter === "all" || BOARD_TIER.esp32 === tierFilter;
 
@@ -94,24 +126,66 @@ export function PartsPalette({
       </div>
 
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-        {visiblePresets.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            draggable
-            onDragStart={dragStart({ kind: "preset", presetId: preset.id })}
-            onClick={() => onStartPlacing(preset.id)}
-            aria-pressed={mode.kind === "placingFree" && mode.presetId === preset.id}
-            className={`cursor-grab rounded-sm border px-3 py-2 text-left text-[13.5px] transition-colors active:cursor-grabbing ${
-              mode.kind === "placingFree" && mode.presetId === preset.id
-                ? "border-navy bg-navy text-ivory"
-                : "border-hairline bg-white text-charcoal hover:border-charcoal/25"
-            }`}
-          >
-            {preset.label}
-          </button>
-        ))}
-        {visiblePresets.length === 0 && (
+        {groups.map(({ type, variants }) => {
+          const groupLabel = PART_GROUP_LABELS[type];
+          const hasVariants = variants.length > 1 && !!groupLabel;
+          if (!hasVariants) {
+            const preset = variants[0];
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                draggable
+                onDragStart={dragStart({ kind: "preset", presetId: preset.id })}
+                onClick={() => onStartPlacing(preset.id)}
+                aria-pressed={mode.kind === "placingFree" && mode.presetId === preset.id}
+                className={`cursor-grab rounded-sm border px-3 py-2 text-left text-[13.5px] transition-colors active:cursor-grabbing ${
+                  mode.kind === "placingFree" && mode.presetId === preset.id
+                    ? "border-navy bg-navy text-ivory"
+                    : "border-hairline bg-white text-charcoal hover:border-charcoal/25"
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          }
+          const selectedId = selectedVariant[type] ?? variants[0].id;
+          const selected = variants.find((v) => v.id === selectedId) ?? variants[0];
+          const isActive = mode.kind === "placingFree" && mode.presetId === selected.id;
+          return (
+            <div key={type} className="flex flex-col gap-1">
+              <button
+                type="button"
+                draggable
+                onDragStart={dragStart({ kind: "preset", presetId: selected.id })}
+                onClick={() => onStartPlacing(selected.id)}
+                aria-pressed={isActive}
+                className={`w-full cursor-grab rounded-sm border px-3 py-2 text-left text-[13.5px] transition-colors active:cursor-grabbing ${
+                  isActive
+                    ? "border-navy bg-navy text-ivory"
+                    : "border-hairline bg-white text-charcoal hover:border-charcoal/25"
+                }`}
+              >
+                {groupLabel} ({presetShortLabel(selected, groupLabel!)})
+              </button>
+              <select
+                aria-label={`${groupLabel} variant`}
+                value={selectedId}
+                onChange={(e) =>
+                  setSelectedVariant((prev) => ({ ...prev, [type]: e.target.value }))
+                }
+                className="rounded-sm border border-hairline bg-white px-1.5 py-1 text-[12.5px] text-charcoal"
+              >
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {presetShortLabel(v, groupLabel!)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+        {groups.length === 0 && (
           <p className="text-[12px] text-charcoal-muted">No parts in this tier yet.</p>
         )}
       </div>

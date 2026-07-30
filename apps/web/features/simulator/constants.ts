@@ -93,39 +93,36 @@ export type PartPreset =
   | { id: string; type: "relay"; label: string; params: RelayParams };
 
 /**
- * How many leads a preset needs, and what to call each one while placing
- * it — a plain 2-lead part just needs "first"/"second" (or "anode"/
- * "cathode" for polarized ones), but a multi-lead part (P2-2, closing
- * ADR 0022) needs one prompt per physical terminal, in the exact order
- * `createComponent` expects them.
+ * Palette grouping (Part 2, docs/architecture/0036-*.md): a type with
+ * more than one preset (e.g. four resistor values) shows as *one*
+ * palette entry with a variant dropdown, not one button per value —
+ * only types actually listed here get that treatment; a type with
+ * exactly one preset (potentiometer, transistor, etc.) keeps a single
+ * plain button. Absent from this map on purpose for single-preset
+ * types, not an oversight.
  */
-export function presetLeadNames(preset: PartPreset): string[] {
-  if (preset.type === "rgbLed") {
-    return ["common leg", "red lead", "green lead", "blue lead"];
-  }
-  if (preset.type === "sevenSegmentDisplay") {
-    return [
-      "common leg",
-      "segment a",
-      "segment b",
-      "segment c",
-      "segment d",
-      "segment e",
-      "segment f",
-      "segment g",
-      "decimal point",
-    ];
-  }
-  if (preset.type === "led" || preset.type === "diode") {
-    return ["anode (+)", "cathode (−)"];
-  }
-  if (preset.type === "transistor") {
-    return ["base", "collector", "emitter"];
-  }
-  if (preset.type === "relay") {
-    return ["coil lead 1", "coil lead 2", "common contact", "normally-open contact"];
-  }
-  return ["first lead", "second lead"];
+export const PART_GROUP_LABELS: Partial<Record<BreadboardComponentType, string>> = {
+  resistor: "Resistor",
+  led: "LED",
+  diode: "Diode",
+  pushbutton: "Pushbutton / Switch",
+  buzzer: "Buzzer",
+  rgbLed: "RGB LED",
+  sevenSegmentDisplay: "7-Segment Display",
+  motionSensor: "Digital Sensor",
+  soilMoistureSensor: "Soil / Water Sensor",
+  rainSensor: "Rain / Flame Sensor",
+  soundSensor: "Sound / Gas Sensor",
+};
+
+/** A preset's short, variant-only label within its group's dropdown —
+ * the parenthesized part of its full label when there is one ("Red"
+ * out of "LED (Red)"), else the full label with the group name
+ * stripped back out. */
+export function presetShortLabel(preset: PartPreset, groupLabel: string): string {
+  const match = preset.label.match(/\(([^)]+)\)$/);
+  if (match) return match[1];
+  return preset.label.replace(groupLabel, "").trim() || preset.label;
 }
 
 /** Real-world typical forward voltages per spec Part 2.2. */
@@ -227,13 +224,13 @@ export const PART_PRESETS: PartPreset[] = [
   {
     id: "pushbutton",
     type: "pushbutton",
-    label: "Pushbutton",
+    label: "Pushbutton / Switch (Momentary)",
     params: { isMomentary: true },
   },
   {
     id: "toggle-switch",
     type: "pushbutton",
-    label: "Toggle Switch",
+    label: "Pushbutton / Switch (Toggle)",
     params: { isMomentary: false },
   },
   {
