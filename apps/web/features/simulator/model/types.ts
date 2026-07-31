@@ -13,6 +13,7 @@ import type {
   LedParams,
   LiIonCellParams,
   MotionSensorParams,
+  PhotodiodeParams,
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
@@ -65,7 +66,9 @@ export type BreadboardComponentType =
   | "idealConnector"
   | "liIonCell"
   | "usbPowerBreakout"
-  | "solarPanel";
+  | "solarPanel"
+  | "bridgeRectifier"
+  | "photodiode";
 
 interface BaseComponent {
   id: string;
@@ -98,6 +101,18 @@ export interface PlacedDiode extends BaseComponent {
   type: "diode";
   params: DiodeParams;
   leadZeroIsPositive: boolean;
+}
+
+/** A photodiode (ADR 0038 diode follow-up) — electrically a diode whose
+ * reverse-biased resistance also depends on a simulated light level
+ * (`component-library`'s `photodiodeModel`), the same shape as `PlacedLdr`
+ * combined with `PlacedDiode`'s own polarity flag. */
+export interface PlacedPhotodiode extends BaseComponent {
+  type: "photodiode";
+  params: PhotodiodeParams;
+  leadZeroIsPositive: boolean;
+  /** Simulated ambient light level, 0 (dark) to 1 (bright) — user-adjustable. */
+  lightLevel: number;
 }
 
 export interface PlacedPushbutton extends BaseComponent {
@@ -273,6 +288,33 @@ export interface PlacedSevenSegmentDisplay {
 }
 
 /**
+ * A bridge rectifier (ADR 0038 diode follow-up) — four identical diode
+ * dies (one shared `DiodeParams`, the same "every segment is the same
+ * die" reuse `SevenSegmentParams.segment` already established) wired in
+ * the classic bridge topology: AC~ lead 1 and AC~ lead 2 are
+ * interchangeable inputs, DC+/DC- are the rectified output. Unlike
+ * transistor/relay (ADR 0026), this needs no two-phase resolve — all
+ * four branches are ordinary diode elements the general MNA/diode
+ * solver already handles in one pass, just wired in a mesh instead of a
+ * shared-leg star like RGB LED/7-segment.
+ */
+export interface BridgeRectifierParams {
+  diode: DiodeParams;
+}
+
+export interface PlacedBridgeRectifier {
+  id: string;
+  type: "bridgeRectifier";
+  params: BridgeRectifierParams;
+  position: { x: number; y: number };
+  acLead1: ConnectionPointRef;
+  acLead2: ConnectionPointRef;
+  dcPositiveLead: ConnectionPointRef;
+  dcNegativeLead: ConnectionPointRef;
+  health: { d1: HealthState; d2: HealthState; d3: HealthState; d4: HealthState };
+}
+
+/**
  * Transistor-as-switch and relay module (P2-2 part 2, closing ADR 0022)
  * both need a two-phase resolve — one branch's on/off state depends on a
  * *different* branch's real solved current, not its own. See
@@ -334,7 +376,9 @@ export type PlacedComponent =
   | PlacedIdealConnector
   | PlacedLiIonCell
   | PlacedUsbPowerBreakout
-  | PlacedSolarPanel;
+  | PlacedSolarPanel
+  | PlacedBridgeRectifier
+  | PlacedPhotodiode;
 
 /** A user-drawn wire directly connecting any two connection points. */
 export interface CanvasWireModel {

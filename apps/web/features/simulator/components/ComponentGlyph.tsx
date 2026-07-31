@@ -33,6 +33,8 @@ import { IdealConnectorGlyph } from "./glyphs/IdealConnectorGlyph";
 import { LiIonCellGlyph } from "./glyphs/LiIonCellGlyph";
 import { UsbPowerBreakoutGlyph } from "./glyphs/UsbPowerBreakoutGlyph";
 import { SolarPanelGlyph } from "./glyphs/SolarPanelGlyph";
+import { BridgeRectifierGlyph } from "./glyphs/BridgeRectifierGlyph";
+import { PhotodiodeGlyph } from "./glyphs/PhotodiodeGlyph";
 
 /** Only the few types not yet given hand-authored SVG artwork fall
  * through to this plain colored-box glyph (buzzer, DC motor, LDR,
@@ -123,6 +125,9 @@ export function ComponentGlyph({
     }
     if (component.type === "diode") {
       return <DiodeGlyph failed={failed} />;
+    }
+    if (component.type === "photodiode") {
+      return <PhotodiodeGlyph lightLevel={component.lightLevel} failed={failed} />;
     }
     if (component.type === "transistor") {
       const isOn = (result?.visual as { isOn?: boolean })?.isOn ?? false;
@@ -221,6 +226,9 @@ export function ComponentGlyph({
     }
     if (component.type === "solarPanel") {
       return <SolarPanelGlyph sunlightLevel={component.sunlightLevel} />;
+    }
+    if (component.type === "bridgeRectifier") {
+      return <BridgeRectifierGlyph />;
     }
     const color = glyphColor(component, result);
     return (

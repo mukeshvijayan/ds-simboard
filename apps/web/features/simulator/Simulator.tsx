@@ -146,6 +146,19 @@ function createComponent(
       health: { coil: health, contact: health },
     };
   }
+  if (preset.type === "bridgeRectifier") {
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      position,
+      acLead1: lead("acLead1"),
+      acLead2: lead("acLead2"),
+      dcPositiveLead: lead("dcPositiveLead"),
+      dcNegativeLead: lead("dcNegativeLead"),
+      health: { d1: health, d2: health, d3: health, d4: health },
+    };
+  }
 
   const leads: [ConnectionPointRef, ConnectionPointRef] = [
     lead(leadNames[0]),
@@ -172,6 +185,17 @@ function createComponent(
         position,
         leads,
         leadZeroIsPositive: true,
+        health,
+      };
+    case "photodiode":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        position,
+        leads,
+        leadZeroIsPositive: true,
+        lightLevel: 0.5,
         health,
       };
     case "pushbutton":
@@ -555,6 +579,12 @@ export function Simulator() {
       prev.map((c) =>
         c.id === id && c.type === "solarPanel" ? { ...c, sunlightLevel } : c
       )
+    );
+  }
+
+  function handlePhotodiodeLightLevelChange(id: string, lightLevel: number) {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === id && c.type === "photodiode" ? { ...c, lightLevel } : c))
     );
   }
 
@@ -1006,6 +1036,7 @@ export function Simulator() {
               onWiperChange={handleWiperChange}
               onLightLevelChange={handleLightLevelChange}
               onSunlightLevelChange={handleSunlightLevelChange}
+              onPhotodiodeLightLevelChange={handlePhotodiodeLightLevelChange}
               onMotionToggle={handleMotionToggle}
               onWetnessChange={handleWetnessChange}
               onRainLevelChange={handleRainLevelChange}

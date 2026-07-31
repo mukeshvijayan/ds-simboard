@@ -13,6 +13,7 @@ import type {
   LedParams,
   LiIonCellParams,
   MotionSensorParams,
+  PhotodiodeParams,
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
@@ -27,6 +28,7 @@ import type {
 } from "@ds-simboard/component-library";
 import type {
   BreadboardComponentType,
+  BridgeRectifierParams,
   RgbLedParams,
   SevenSegmentParams,
 } from "./model/types";
@@ -68,6 +70,8 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   liIonCell: "Li-ion/LiPo Cell",
   usbPowerBreakout: "USB Power Breakout",
   solarPanel: "Solar Panel",
+  bridgeRectifier: "Bridge Rectifier",
+  photodiode: "Photodiode",
 };
 
 /**
@@ -119,7 +123,14 @@ export type PartPreset =
       label: string;
       params: UsbPowerBreakoutParams;
     }
-  | { id: string; type: "solarPanel"; label: string; params: SolarPanelParams };
+  | { id: string; type: "solarPanel"; label: string; params: SolarPanelParams }
+  | {
+      id: string;
+      type: "bridgeRectifier";
+      label: string;
+      params: BridgeRectifierParams;
+    }
+  | { id: string; type: "photodiode"; label: string; params: PhotodiodeParams };
 
 /**
  * Palette grouping (Part 2, docs/architecture/0036-*.md): a type with
@@ -602,6 +613,27 @@ export const PART_PRESETS: PartPreset[] = [
     type: "solarPanel",
     label: "Solar Panel",
     params: { minResistanceOhms: 20, maxResistanceOhms: 1_000_000 },
+  },
+  // ADR 0038 diode follow-up: bridge rectifier and photodiode, the two
+  // buildable-now diode-family parts paced into their own pass.
+  {
+    id: "bridge-rectifier",
+    type: "bridgeRectifier",
+    label: "Bridge Rectifier",
+    params: {
+      diode: { forwardVoltageVolts: 0.7, reverseBreakdownVoltageVolts: 1000 },
+    },
+  },
+  {
+    id: "photodiode",
+    type: "photodiode",
+    label: "Photodiode",
+    params: {
+      forwardVoltageVolts: 0.7,
+      reverseBreakdownVoltageVolts: 60,
+      darkResistanceOhms: 10_000_000,
+      litResistanceOhms: 1_000,
+    },
   },
 ];
 

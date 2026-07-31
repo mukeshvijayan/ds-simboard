@@ -264,3 +264,14 @@ export type {
   SolarPanelInput,
   SolarPanelVisual,
 } from "./components/solarPanel/solarPanel";
+
+export {
+  evaluatePhotodiode,
+  effectivePhotodiodeResistance,
+  photodiodeModel,
+} from "./components/photodiode/photodiode";
+export type {
+  PhotodiodeParams,
+  PhotodiodeInput,
+  PhotodiodeVisual,
+} from "./components/photodiode/photodiode";

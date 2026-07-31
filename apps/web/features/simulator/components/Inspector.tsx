@@ -16,6 +16,7 @@ export function Inspector({
   onWiperChange,
   onLightLevelChange,
   onSunlightLevelChange,
+  onPhotodiodeLightLevelChange,
   onMotionToggle,
   onWetnessChange,
   onRainLevelChange,
@@ -30,6 +31,7 @@ export function Inspector({
   onWiperChange: (id: string, wiperPosition: number) => void;
   onLightLevelChange: (id: string, lightLevel: number) => void;
   onSunlightLevelChange: (id: string, sunlightLevel: number) => void;
+  onPhotodiodeLightLevelChange: (id: string, lightLevel: number) => void;
   onMotionToggle: (id: string) => void;
   onWetnessChange: (id: string, wetness: number) => void;
   onRainLevelChange: (id: string, rainLevel: number) => void;
@@ -112,6 +114,53 @@ export function Inspector({
             <dt className="text-charcoal-muted">Conducting</dt>
             <dd>
               {(result.visual as { isConducting: boolean }).isConducting ? "Yes" : "No"}
+            </dd>
+          </div>
+        )}
+
+        {component.type === "photodiode" && result && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Conducting</dt>
+              <dd>
+                {(result.visual as { isConducting: boolean }).isConducting ? "Yes" : "No"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Light level</dt>
+              <dd>{Math.round(component.lightLevel * 100)}%</dd>
+            </div>
+            {(result.visual as { isReverseBiased: boolean }).isReverseBiased && (
+              <div className="flex justify-between">
+                <dt className="text-charcoal-muted">Resistance</dt>
+                <dd>
+                  {Math.round(
+                    (result.visual as { effectiveResistanceOhms: number })
+                      .effectiveResistanceOhms
+                  ).toLocaleString()}
+                  Ω
+                </dd>
+              </div>
+            )}
+          </>
+        )}
+
+        {component.type === "bridgeRectifier" && result && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Diodes conducting</dt>
+            <dd>
+              {
+                (["d1", "d2", "d3", "d4"] as const).filter(
+                  (name) =>
+                    (
+                      result.visual as Record<
+                        "d1" | "d2" | "d3" | "d4",
+                        { visual: { isConducting: boolean } }
+                      >
+                    )[name].visual.isConducting
+                ).length
+              }
+              {" / 4"}
             </dd>
           </div>
         )}
@@ -417,6 +466,22 @@ export function Inspector({
             step={0.01}
             value={component.sunlightLevel}
             onChange={(e) => onSunlightLevelChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "photodiode" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated light level
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.lightLevel}
+            onChange={(e) =>
+              onPhotodiodeLightLevelChange(component.id, Number(e.target.value))
+            }
           />
         </label>
       )}

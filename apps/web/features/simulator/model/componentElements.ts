@@ -80,8 +80,39 @@ export function componentGraphElements(
     ];
   }
 
+  if (component.type === "bridgeRectifier") {
+    // The classic full-bridge topology: whichever AC lead is momentarily
+    // higher forward-biases the diode pair that routes current to
+    // dcPositiveLead and back from dcNegativeLead through the other pair
+    // — real reverse-polarity-safe rectification, not scripted.
+    return [
+      {
+        elementId: `${component.id}:d1`,
+        nodeA: component.acLead1,
+        nodeB: component.dcPositiveLead,
+      },
+      {
+        elementId: `${component.id}:d2`,
+        nodeA: component.acLead2,
+        nodeB: component.dcPositiveLead,
+      },
+      {
+        elementId: `${component.id}:d3`,
+        nodeA: component.dcNegativeLead,
+        nodeB: component.acLead1,
+      },
+      {
+        elementId: `${component.id}:d4`,
+        nodeA: component.dcNegativeLead,
+        nodeB: component.acLead2,
+      },
+    ];
+  }
+
   const swapLeads =
-    (component.type === "led" || component.type === "diode") &&
+    (component.type === "led" ||
+      component.type === "diode" ||
+      component.type === "photodiode") &&
     !component.leadZeroIsPositive;
   const [anodeLead, cathodeLead] = swapLeads
     ? [component.leads[1], component.leads[0]]
@@ -118,6 +149,14 @@ export function componentLeadPoints(component: PlacedComponent): ConnectionPoint
       component.coilLeadB,
       component.contactLeadA,
       component.contactLeadB,
+    ];
+  }
+  if (component.type === "bridgeRectifier") {
+    return [
+      component.acLead1,
+      component.acLead2,
+      component.dcPositiveLead,
+      component.dcNegativeLead,
     ];
   }
   return [component.leads[0], component.leads[1]];

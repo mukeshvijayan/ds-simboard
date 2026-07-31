@@ -19,10 +19,12 @@ import {
   evaluateFerriteBead,
   evaluateIdealConnector,
   evaluateInductor,
+  effectivePhotodiodeResistance,
   evaluateLdr,
   evaluateLed,
   evaluateLiIonCell,
   evaluateMotionSensor,
+  evaluatePhotodiode,
   evaluatePotentiometer,
   evaluatePushbutton,
   evaluateRainSensor,
@@ -57,6 +59,7 @@ import {
   type BuzzerVisual,
   type DcMotorVisual,
   type Dht11Visual,
+  type DiodeParams,
   type DiodeVisual,
   type FastBlowFuseVisual,
   type FerriteBeadVisual,
@@ -69,6 +72,8 @@ import {
   type HealthState,
   type HealthStatus,
   type MotionSensorVisual,
+  type PhotodiodeParams,
+  type PhotodiodeVisual,
   type PotentiometerVisual,
   type PushbuttonVisual,
   type RainSensorVisual,
@@ -96,7 +101,9 @@ import {
   type CanvasWireModel,
   type PlacedBoard,
   type PlacedBreadboard,
+  type PlacedBridgeRectifier,
   type PlacedComponent,
+  type PlacedPhotodiode,
   type PlacedRelay,
   type PlacedRgbLed,
   type PlacedSevenSegmentDisplay,
@@ -120,6 +127,17 @@ export interface SevenSegmentVisual {
 export interface RelayVisual {
   coil: { health: HealthState; visual: RelayCoilVisual };
   contact: { health: HealthState; visual: RelayContactVisual };
+}
+
+/** A bridge rectifier's four diode dies (ADR 0038 diode follow-up) —
+ * same per-branch health/visual shape as `RgbLedVisual`/`RelayVisual`,
+ * just four branches in a bridge topology instead of a shared-leg star
+ * or two isolated loops. */
+export interface BridgeRectifierVisual {
+  d1: { health: HealthState; visual: DiodeVisual };
+  d2: { health: HealthState; visual: DiodeVisual };
+  d3: { health: HealthState; visual: DiodeVisual };
+  d4: { health: HealthState; visual: DiodeVisual };
 }
 
 export type ComponentVisual =
@@ -148,7 +166,9 @@ export type ComponentVisual =
   | IdealConnectorVisual
   | LiIonCellVisual
   | UsbPowerBreakoutVisual
-  | SolarPanelVisual;
+  | SolarPanelVisual
+  | BridgeRectifierVisual
+  | PhotodiodeVisual;
 
 /** A multi-lead component's `health` is per-channel (a real LED die can
  * fail independently of its neighbors sharing one package) — not every
@@ -157,7 +177,8 @@ export type ComponentHealth =
   | HealthState
   | { red: HealthState; green: HealthState; blue: HealthState }
   | Record<SevenSegmentName, HealthState>
-  | { coil: HealthState; contact: HealthState };
+  | { coil: HealthState; contact: HealthState }
+  | { d1: HealthState; d2: HealthState; d3: HealthState; d4: HealthState };
 
 export interface ComponentResult {
   health: ComponentHealth;
@@ -529,6 +550,92 @@ function evaluateLedChannel(
   return { health: result.health, visual: result.visual };
 }
 
+/** Same shape as `evaluateLedChannel`, for a bridge rectifier's four
+ * identical diode dies. */
+function evaluateDiodeChannel(
+  params: DiodeParams,
+  health: HealthState,
+  outcome: ElementOutcome
+): { health: HealthState; visual: DiodeVisual } {
+  if (health.status === "failed") {
+    const result = evaluateDiode(
+      params,
+      { biased: "forward", currentAmps: outcome.currentAmps },
+      { health }
+    );
+    return { health: result.health, visual: result.visual };
+  }
+  const result = outcome.isForward
+    ? evaluateDiode(
+        params,
+        { biased: "forward", currentAmps: outcome.currentAmps },
+        { health }
+      )
+    : evaluateDiode(
+        params,
+        { biased: "reverse", voltageVolts: -outcome.voltageAcross },
+        { health }
+      );
+  return { health: result.health, visual: result.visual };
+}
+
+function evaluateBridgeRectifier(
+  component: PlacedBridgeRectifier,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const d1 = evaluateDiodeChannel(
+    component.params.diode,
+    component.health.d1,
+    getOutcome(`${component.id}:d1`)
+  );
+  const d2 = evaluateDiodeChannel(
+    component.params.diode,
+    component.health.d2,
+    getOutcome(`${component.id}:d2`)
+  );
+  const d3 = evaluateDiodeChannel(
+    component.params.diode,
+    component.health.d3,
+    getOutcome(`${component.id}:d3`)
+  );
+  const d4 = evaluateDiodeChannel(
+    component.params.diode,
+    component.health.d4,
+    getOutcome(`${component.id}:d4`)
+  );
+  return {
+    health: { d1: d1.health, d2: d2.health, d3: d3.health, d4: d4.health },
+    visual: { d1, d2, d3, d4 },
+  };
+}
+
+/** A photodiode's own bespoke evaluate (not folded into `evaluatePolarized`
+ * — its reverse-biased branch additionally needs `lightLevel`, which no
+ * other polarized component carries). */
+function evaluatePhotodiodeComponent(
+  component: PlacedPhotodiode,
+  outcome: ElementOutcome
+): ComponentResult {
+  if (component.health.status === "failed" || outcome.isForward) {
+    const result = evaluatePhotodiode(
+      component.params,
+      { biased: "forward", currentAmps: outcome.currentAmps },
+      { health: component.health }
+    );
+    return { health: result.health, visual: result.visual };
+  }
+  const result = evaluatePhotodiode(
+    component.params,
+    {
+      biased: "reverse",
+      voltageVolts: -outcome.voltageAcross,
+      lightLevel: component.lightLevel,
+    },
+    { health: component.health }
+  );
+  return { health: result.health, visual: result.visual };
+}
+
 function describeLedLikeElement(
   params: { forwardVoltageVolts: number },
   health: HealthState
@@ -540,6 +647,25 @@ function describeLedLikeElement(
     kind: "diode",
     forwardVoltageVolts: params.forwardVoltageVolts,
     reverseResistanceOhms: Infinity,
+  };
+}
+
+/** Same shape as `describeLedLikeElement`, except a photodiode's
+ * reverse-biased resistance is its light-dependent value (its real
+ * light-sensing operating mode), not an ideal open circuit — the one
+ * difference from a plain diode/LED's always-open reverse behavior. */
+function describePhotodiodeElement(
+  params: PhotodiodeParams,
+  health: HealthState,
+  lightLevel: number
+): MnaDiodeElementDescriptor {
+  if (health.status === "failed") {
+    return { kind: "resistive", resistanceOhms: 0 };
+  }
+  return {
+    kind: "diode",
+    forwardVoltageVolts: params.forwardVoltageVolts,
+    reverseResistanceOhms: effectivePhotodiodeResistance(params, lightLevel),
   };
 }
 
@@ -568,6 +694,13 @@ function describeElement(
   if (component.type === "led" || component.type === "diode") {
     return describeLedLikeElement(component.params, component.health);
   }
+  if (component.type === "photodiode") {
+    return describePhotodiodeElement(
+      component.params,
+      component.health,
+      component.lightLevel
+    );
+  }
   if (component.type === "rgbLed") {
     const channel = elementId.slice(component.id.length + 1) as "red" | "green" | "blue";
     return describeLedLikeElement(component.params[channel], component.health[channel]);
@@ -575,6 +708,10 @@ function describeElement(
   if (component.type === "sevenSegmentDisplay") {
     const segment = elementId.slice(component.id.length + 1) as SevenSegmentName;
     return describeLedLikeElement(component.params.segment, component.health[segment]);
+  }
+  if (component.type === "bridgeRectifier") {
+    const branch = elementId.slice(component.id.length + 1) as "d1" | "d2" | "d3" | "d4";
+    return describeLedLikeElement(component.params.diode, component.health[branch]);
   }
   if (component.type === "transistor") {
     if (elementId.endsWith(":be")) {
@@ -842,6 +979,12 @@ function evaluateComponent(
   }
   if (component.type === "relay") {
     return evaluateRelayComponent(component, getOutcome);
+  }
+  if (component.type === "bridgeRectifier") {
+    return evaluateBridgeRectifier(component, getOutcome);
+  }
+  if (component.type === "photodiode") {
+    return evaluatePhotodiodeComponent(component, getOutcome(component.id));
   }
   if (component.type === "led" || component.type === "diode") {
     const outcome = getOutcome(component.id);
@@ -1160,6 +1303,17 @@ function withShortCircuitHealth(component: PlacedComponent): PlacedComponent {
       health: {
         coil: applyShortCircuitHealth(component.health.coil),
         contact: applyShortCircuitHealth(component.health.contact),
+      },
+    };
+  }
+  if (component.type === "bridgeRectifier") {
+    return {
+      ...component,
+      health: {
+        d1: applyShortCircuitHealth(component.health.d1),
+        d2: applyShortCircuitHealth(component.health.d2),
+        d3: applyShortCircuitHealth(component.health.d3),
+        d4: applyShortCircuitHealth(component.health.d4),
       },
     };
   }

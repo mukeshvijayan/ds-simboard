@@ -226,6 +226,36 @@ for the same reason ADR 0028/0030 stopped rather than guessed — this
 report surfaces it explicitly rather than either silently building a
 voltage-changing block or silently declining to.
 
+### Resolution — buck converter, boost converter, LiPo charging module stay deferred (user decision, 2026-07-31)
+
+The flag above was raised, not decided, deliberately — reversing ADR
+0016 is a real product/architecture call. The user's answer: **keep
+ADR 0016's single-supply model as-is; do not build these three.** This
+is recorded here as a deliberate, considered call, not a gap someone
+forgot about:
+
+- **Not a permanent ban, no fixed re-review date.** The trigger for
+  revisiting it is **real demand** for teaching multi-voltage-domain
+  power regulation (buck/boost conversion, charge controllers) — a
+  concrete curriculum/user need, the same bar ADR 0028 (Raspberry Pi)
+  and ADR 0030 (Phase A3) set for their own open questions. It is not
+  "revisit in N months" or "revisit once some other ADR ships."
+- **What would actually need to change if that demand shows up:** ADR
+  0016's boundary itself, not just these three components — the same
+  single-supply model also governs every other placeable "source"
+  component (battery holder, Li-ion cell, USB power breakout above).
+  Building buck/boost/charging module honestly would mean the
+  free-floating architecture's `describeElement` gaining a genuine
+  second independently-regulated voltage domain per instance, which is
+  real, scoped engine-adjacent work (closer in size to the multi-lead
+  milestone ADR 0022 scoped out on its own), not a small addition
+  alongside a components-catalog pass.
+- **Until then**, a curriculum need for "what a buck/boost converter
+  does" is better served by a static diagram/explanation than a
+  simulator component that either lies about what it does (transparent
+  pass-through) or doesn't exist — the same reasoning ADR 0037 applied
+  to the Zener exclusion.
+
 ## What this unblocks vs. defers
 
 - **Unblocked, building now:** 15 parts across passives/protection,
@@ -270,6 +300,6 @@ voltage-changing block or silently declining to.
   and the flagged product-decision set) — whoever picks any of them back
   up should re-audit against whatever engine capability changed by then,
   the same way this ADR re-audited ADR 0017/0022's deferrals.
-- The buck/boost converter/LiPo charging module question is left for the
-  user to resolve before any of the three gets built, rather than guessed
-  at either direction.
+- The buck/boost converter/LiPo charging module question is resolved:
+  deferred indefinitely, not a fixed-date revisit — see the "Resolution"
+  section above for the concrete trigger (real demand, not a schedule).
