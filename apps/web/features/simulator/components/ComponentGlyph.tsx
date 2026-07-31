@@ -25,6 +25,14 @@ import { Dht11Glyph } from "./glyphs/Dht11Glyph";
 import { RgbLedGlyph } from "./glyphs/RgbLedGlyph";
 import { SevenSegmentGlyph } from "./glyphs/SevenSegmentGlyph";
 import { RelayGlyph } from "./glyphs/RelayGlyph";
+import { InductorGlyph } from "./glyphs/InductorGlyph";
+import { FerriteBeadGlyph } from "./glyphs/FerriteBeadGlyph";
+import { FastBlowFuseGlyph } from "./glyphs/FastBlowFuseGlyph";
+import { ResettableFuseGlyph } from "./glyphs/ResettableFuseGlyph";
+import { IdealConnectorGlyph } from "./glyphs/IdealConnectorGlyph";
+import { LiIonCellGlyph } from "./glyphs/LiIonCellGlyph";
+import { UsbPowerBreakoutGlyph } from "./glyphs/UsbPowerBreakoutGlyph";
+import { SolarPanelGlyph } from "./glyphs/SolarPanelGlyph";
 
 /** Only the few types not yet given hand-authored SVG artwork fall
  * through to this plain colored-box glyph (buzzer, DC motor, LDR,
@@ -185,6 +193,34 @@ export function ComponentGlyph({
         (result?.visual as { contact: { visual: { isClosed: boolean } } })?.contact.visual
           .isClosed ?? false;
       return <RelayGlyph contactClosed={isClosed} />;
+    }
+    if (component.type === "inductor") {
+      return <InductorGlyph />;
+    }
+    if (component.type === "ferriteBead") {
+      return <FerriteBeadGlyph />;
+    }
+    if (component.type === "fastBlowFuse") {
+      return <FastBlowFuseGlyph blown={failed} />;
+    }
+    if (component.type === "resettableFuse") {
+      return <ResettableFuseGlyph tripped={status === "stressed"} />;
+    }
+    if (component.type === "idealConnector") {
+      return <IdealConnectorGlyph kind={component.params.kind} />;
+    }
+    if (component.type === "liIonCell") {
+      const suppliedVoltageVolts =
+        (result?.visual as { suppliedVoltageVolts?: number })?.suppliedVoltageVolts ?? 0;
+      return <LiIonCellGlyph suppliedVoltageVolts={suppliedVoltageVolts} />;
+    }
+    if (component.type === "usbPowerBreakout") {
+      const suppliedVoltageVolts =
+        (result?.visual as { suppliedVoltageVolts?: number })?.suppliedVoltageVolts ?? 0;
+      return <UsbPowerBreakoutGlyph suppliedVoltageVolts={suppliedVoltageVolts} />;
+    }
+    if (component.type === "solarPanel") {
+      return <SolarPanelGlyph sunlightLevel={component.sunlightLevel} />;
     }
     const color = glyphColor(component, result);
     return (

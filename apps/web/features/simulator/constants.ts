@@ -5,17 +5,25 @@ import type {
   DcMotorParams,
   Dht11Params,
   DiodeParams,
+  FastBlowFuseParams,
+  FerriteBeadParams,
+  IdealConnectorParams,
+  InductorParams,
   LdrParams,
   LedParams,
+  LiIonCellParams,
   MotionSensorParams,
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
+  ResettableFuseParams,
   RelayParams,
   ResistorParams,
   SoilMoistureSensorParams,
+  SolarPanelParams,
   SoundSensorParams,
   TransistorParams,
+  UsbPowerBreakoutParams,
 } from "@ds-simboard/component-library";
 import type {
   BreadboardComponentType,
@@ -52,6 +60,14 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   sevenSegmentDisplay: "7-Segment Display",
   transistor: "Transistor (NPN Switch)",
   relay: "Relay Module",
+  inductor: "Inductor",
+  ferriteBead: "Ferrite Bead",
+  fastBlowFuse: "Fast-Blow Fuse",
+  resettableFuse: "Resettable Fuse (PTC)",
+  idealConnector: "Connector",
+  liIonCell: "Li-ion/LiPo Cell",
+  usbPowerBreakout: "USB Power Breakout",
+  solarPanel: "Solar Panel",
 };
 
 /**
@@ -90,7 +106,20 @@ export type PartPreset =
       params: SevenSegmentParams;
     }
   | { id: string; type: "transistor"; label: string; params: TransistorParams }
-  | { id: string; type: "relay"; label: string; params: RelayParams };
+  | { id: string; type: "relay"; label: string; params: RelayParams }
+  | { id: string; type: "inductor"; label: string; params: InductorParams }
+  | { id: string; type: "ferriteBead"; label: string; params: FerriteBeadParams }
+  | { id: string; type: "fastBlowFuse"; label: string; params: FastBlowFuseParams }
+  | { id: string; type: "resettableFuse"; label: string; params: ResettableFuseParams }
+  | { id: string; type: "idealConnector"; label: string; params: IdealConnectorParams }
+  | { id: string; type: "liIonCell"; label: string; params: LiIonCellParams }
+  | {
+      id: string;
+      type: "usbPowerBreakout";
+      label: string;
+      params: UsbPowerBreakoutParams;
+    }
+  | { id: string; type: "solarPanel"; label: string; params: SolarPanelParams };
 
 /**
  * Palette grouping (Part 2, docs/architecture/0036-*.md): a type with
@@ -113,6 +142,7 @@ export const PART_GROUP_LABELS: Partial<Record<BreadboardComponentType, string>>
   soilMoistureSensor: "Soil / Water Sensor",
   rainSensor: "Rain / Flame Sensor",
   soundSensor: "Sound / Gas Sensor",
+  idealConnector: "Connector",
 };
 
 /** A preset's short, variant-only label within its group's dropdown —
@@ -483,6 +513,95 @@ export const PART_PRESETS: PartPreset[] = [
       maxCoilCurrentAmps: 0.05,
       maxContactCurrentAmps: 2,
     },
+  },
+  // ADR 0038: passives/protection, power, and storage/connectors —
+  // buildable-now set.
+  {
+    id: "inductor",
+    type: "inductor",
+    label: "Inductor",
+    params: { dcResistanceOhms: 0.5, ratedCurrentAmps: 1 },
+  },
+  {
+    id: "ferrite-bead",
+    type: "ferriteBead",
+    label: "Ferrite Bead",
+    params: { dcResistanceOhms: 0.1, ratedCurrentAmps: 3 },
+  },
+  {
+    id: "fast-blow-fuse",
+    type: "fastBlowFuse",
+    label: "Fast-Blow Fuse (1A)",
+    params: { restingResistanceOhms: 0.05, ratedCurrentAmps: 1 },
+  },
+  {
+    id: "resettable-fuse",
+    type: "resettableFuse",
+    label: "Resettable Fuse (PTC, 1A)",
+    params: {
+      restingResistanceOhms: 0.1,
+      trippedResistanceOhms: 1000,
+      tripCurrentAmps: 1,
+      holdCurrentAmps: 0.3,
+      destructiveCurrentAmps: 10,
+    },
+  },
+  // idealConnector's six presets are all the same ideal 0Ω pass-through
+  // (docs/architecture/0038-*.md) — only `params.kind` (a display-only
+  // field) and the label differ.
+  {
+    id: "header-pins",
+    type: "idealConnector",
+    label: "Header Pins",
+    params: { kind: "headerPins" },
+  },
+  {
+    id: "header-sockets",
+    type: "idealConnector",
+    label: "Header Sockets",
+    params: { kind: "headerSockets" },
+  },
+  {
+    id: "jst-connector",
+    type: "idealConnector",
+    label: "JST Connector",
+    params: { kind: "jstConnector" },
+  },
+  {
+    id: "dc-barrel-jack",
+    type: "idealConnector",
+    label: "DC Barrel Jack",
+    params: { kind: "dcBarrelJack" },
+  },
+  {
+    id: "screw-terminal",
+    type: "idealConnector",
+    label: "Screw Terminal",
+    params: { kind: "screwTerminal" },
+  },
+  {
+    id: "alligator-clips",
+    type: "idealConnector",
+    label: "Alligator Clips",
+    params: { kind: "alligatorClips" },
+  },
+  {
+    id: "li-ion-cell",
+    type: "liIonCell",
+    label: "Li-ion/LiPo Cell",
+    params: {},
+  },
+  {
+    id: "usb-power-breakout",
+    type: "usbPowerBreakout",
+    label: "USB Power Breakout",
+    params: {},
+  },
+  {
+    id: "solar-panel",
+    type: "solarPanel",
+    label: "Solar Panel",
+    params: { minResistanceOhms: 20, maxResistanceOhms: 1_000_000 },
   },
 ];
 

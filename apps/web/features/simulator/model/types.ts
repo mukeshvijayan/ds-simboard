@@ -4,18 +4,26 @@ import type {
   DcMotorParams,
   Dht11Params,
   DiodeParams,
+  FastBlowFuseParams,
+  FerriteBeadParams,
   HealthState,
+  IdealConnectorParams,
+  InductorParams,
   LdrParams,
   LedParams,
+  LiIonCellParams,
   MotionSensorParams,
   PotentiometerParams,
   PushbuttonParams,
   RainSensorParams,
+  ResettableFuseParams,
   RelayParams,
   ResistorParams,
   SoilMoistureSensorParams,
+  SolarPanelParams,
   SoundSensorParams,
   TransistorParams,
+  UsbPowerBreakoutParams,
 } from "@ds-simboard/component-library";
 import type { ConnectionPointRef } from "./connectionPoint";
 import type { BoardType } from "./boardPins";
@@ -47,7 +55,17 @@ export type BreadboardComponentType =
   | "rgbLed"
   | "sevenSegmentDisplay"
   | "transistor"
-  | "relay";
+  | "relay"
+  // ADR 0038: passives/protection, power, and storage/connectors —
+  // buildable-now set.
+  | "inductor"
+  | "ferriteBead"
+  | "fastBlowFuse"
+  | "resettableFuse"
+  | "idealConnector"
+  | "liIonCell"
+  | "usbPowerBreakout"
+  | "solarPanel";
 
 interface BaseComponent {
   id: string;
@@ -151,6 +169,48 @@ export interface PlacedDht11 extends BaseComponent {
   /** Display-only simulated readings — not tied to the electrical model. */
   simulatedTemperatureCelsius: number;
   simulatedHumidityPercent: number;
+}
+
+export interface PlacedInductor extends BaseComponent {
+  type: "inductor";
+  params: InductorParams;
+}
+
+export interface PlacedFerriteBead extends BaseComponent {
+  type: "ferriteBead";
+  params: FerriteBeadParams;
+}
+
+export interface PlacedFastBlowFuse extends BaseComponent {
+  type: "fastBlowFuse";
+  params: FastBlowFuseParams;
+}
+
+export interface PlacedResettableFuse extends BaseComponent {
+  type: "resettableFuse";
+  params: ResettableFuseParams;
+}
+
+export interface PlacedIdealConnector extends BaseComponent {
+  type: "idealConnector";
+  params: IdealConnectorParams;
+}
+
+export interface PlacedLiIonCell extends BaseComponent {
+  type: "liIonCell";
+  params: LiIonCellParams;
+}
+
+export interface PlacedUsbPowerBreakout extends BaseComponent {
+  type: "usbPowerBreakout";
+  params: UsbPowerBreakoutParams;
+}
+
+export interface PlacedSolarPanel extends BaseComponent {
+  type: "solarPanel";
+  params: SolarPanelParams;
+  /** Simulated sunlight level, 0 (dark) to 1 (full sun) — user-adjustable. */
+  sunlightLevel: number;
 }
 
 /**
@@ -266,7 +326,15 @@ export type PlacedComponent =
   | PlacedRgbLed
   | PlacedSevenSegmentDisplay
   | PlacedTransistor
-  | PlacedRelay;
+  | PlacedRelay
+  | PlacedInductor
+  | PlacedFerriteBead
+  | PlacedFastBlowFuse
+  | PlacedResettableFuse
+  | PlacedIdealConnector
+  | PlacedLiIonCell
+  | PlacedUsbPowerBreakout
+  | PlacedSolarPanel;
 
 /** A user-drawn wire directly connecting any two connection points. */
 export interface CanvasWireModel {

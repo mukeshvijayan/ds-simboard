@@ -15,36 +15,57 @@ import {
   evaluateDcMotor,
   evaluateDht11,
   evaluateDiode,
+  evaluateFastBlowFuse,
+  evaluateFerriteBead,
+  evaluateIdealConnector,
+  evaluateInductor,
   evaluateLdr,
   evaluateLed,
+  evaluateLiIonCell,
   evaluateMotionSensor,
   evaluatePotentiometer,
   evaluatePushbutton,
   evaluateRainSensor,
   evaluateRelayCoil,
   evaluateRelayContact,
+  evaluateResettableFuse,
   evaluateResistor,
   evaluateSoilMoistureSensor,
+  evaluateSolarPanel,
   evaluateSoundSensor,
   evaluateTransistor,
+  evaluateUsbPowerBreakout,
+  fastBlowFuseSeriesElement,
+  ferriteBeadSeriesElement,
+  idealConnectorSeriesElement,
+  inductorSeriesElement,
   ldrSeriesElement,
+  liIonCellSeriesElement,
   motionSensorSeriesElement,
   potentiometerSeriesElement,
   pushbuttonSeriesElement,
   rainSensorSeriesElement,
   relayIsEnergized,
+  resettableFuseSeriesElement,
   resistorSeriesElement,
   soilMoistureSensorSeriesElement,
+  solarPanelSeriesElement,
   soundSensorSeriesElement,
   transistorIsOn,
+  usbPowerBreakoutSeriesElement,
   type BatteryHolderVisual,
   type BuzzerVisual,
   type DcMotorVisual,
   type Dht11Visual,
   type DiodeVisual,
+  type FastBlowFuseVisual,
+  type FerriteBeadVisual,
+  type IdealConnectorVisual,
+  type InductorVisual,
   type LdrVisual,
   type LedParams,
   type LedVisual,
+  type LiIonCellVisual,
   type HealthState,
   type HealthStatus,
   type MotionSensorVisual,
@@ -53,10 +74,13 @@ import {
   type RainSensorVisual,
   type RelayCoilVisual,
   type RelayContactVisual,
+  type ResettableFuseVisual,
   type ResistorVisual,
   type SoilMoistureSensorVisual,
+  type SolarPanelVisual,
   type SoundSensorVisual,
   type TransistorVisual,
+  type UsbPowerBreakoutVisual,
 } from "@ds-simboard/component-library";
 import {
   buildCircuit,
@@ -116,7 +140,15 @@ export type ComponentVisual =
   | RgbLedVisual
   | SevenSegmentVisual
   | TransistorVisual
-  | RelayVisual;
+  | RelayVisual
+  | InductorVisual
+  | FerriteBeadVisual
+  | FastBlowFuseVisual
+  | ResettableFuseVisual
+  | IdealConnectorVisual
+  | LiIonCellVisual
+  | UsbPowerBreakoutVisual
+  | SolarPanelVisual;
 
 /** A multi-lead component's `health` is per-channel (a real LED die can
  * fail independently of its neighbors sharing one package) — not every
@@ -230,7 +262,15 @@ type NonPolarizedComponent = Extract<
       | "soilMoistureSensor"
       | "rainSensor"
       | "soundSensor"
-      | "dht11";
+      | "dht11"
+      | "inductor"
+      | "ferriteBead"
+      | "fastBlowFuse"
+      | "resettableFuse"
+      | "idealConnector"
+      | "liIonCell"
+      | "usbPowerBreakout"
+      | "solarPanel";
   }
 >;
 type PolarizedComponent = Extract<PlacedComponent, { type: "led" | "diode" }>;
@@ -357,6 +397,70 @@ function evaluateNonPolarized(
           simulatedTemperatureCelsius: component.simulatedTemperatureCelsius,
           simulatedHumidityPercent: component.simulatedHumidityPercent,
         },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "inductor": {
+      const result = evaluateInductor(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "ferriteBead": {
+      const result = evaluateFerriteBead(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "fastBlowFuse": {
+      const result = evaluateFastBlowFuse(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "resettableFuse": {
+      const result = evaluateResettableFuse(
+        component.params,
+        { currentAmps },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "idealConnector": {
+      const result = evaluateIdealConnector(
+        component.params,
+        {},
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "liIonCell": {
+      const result = evaluateLiIonCell(
+        component.params,
+        { supplyVoltageVolts },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "usbPowerBreakout": {
+      const result = evaluateUsbPowerBreakout(
+        component.params,
+        { supplyVoltageVolts },
+        { health: component.health }
+      );
+      return { health: result.health, visual: result.visual };
+    }
+    case "solarPanel": {
+      const result = evaluateSolarPanel(
+        component.params,
+        { sunlightLevel: component.sunlightLevel },
         { health: component.health }
       );
       return { health: result.health, visual: result.visual };
@@ -581,6 +685,52 @@ function describeElement(
       return {
         kind: "resistive",
         resistanceOhms: resistanceOhmsOf(dht11SeriesElement(component.params)),
+      };
+    case "inductor":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(inductorSeriesElement(component.params)),
+      };
+    case "ferriteBead":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(ferriteBeadSeriesElement(component.params)),
+      };
+    case "fastBlowFuse":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(
+          fastBlowFuseSeriesElement(component.params, component.health)
+        ),
+      };
+    case "resettableFuse":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(
+          resettableFuseSeriesElement(component.params, component.health)
+        ),
+      };
+    case "idealConnector":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(idealConnectorSeriesElement()),
+      };
+    case "liIonCell":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(liIonCellSeriesElement()),
+      };
+    case "usbPowerBreakout":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(usbPowerBreakoutSeriesElement()),
+      };
+    case "solarPanel":
+      return {
+        kind: "resistive",
+        resistanceOhms: resistanceOhmsOf(
+          solarPanelSeriesElement(component.params, component.sunlightLevel)
+        ),
       };
   }
 }

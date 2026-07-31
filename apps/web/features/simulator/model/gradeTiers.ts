@@ -35,7 +35,13 @@ export const GRADE_TIER_RANGES: Record<GradeTier, string> = {
  * (RGB LED, 7-segment display, transistor, relay — closed by ADR 0025/
  * 0026) are `"advanced"`, alongside real microcontroller boards (ADR
  * 0027), which need genuinely more background to use meaningfully than
- * any single component does.
+ * any single component does. ADR 0038's passives/protection, power, and
+ * storage/connector families (a category the original grade-band request
+ * never covered at all) are placed in `"advanced"` alongside the other
+ * multi-lead/power-electronics parts, matching their real grade 9-10+
+ * curriculum placement (fuses/protection circuits, power regulation) —
+ * not a claim they're electrically as complex as a transistor, just that
+ * they belong with the same audience.
  */
 export const COMPONENT_TIER: Record<BreadboardComponentType, GradeTier> = {
   resistor: "foundations",
@@ -56,6 +62,14 @@ export const COMPONENT_TIER: Record<BreadboardComponentType, GradeTier> = {
   sevenSegmentDisplay: "advanced",
   transistor: "advanced",
   relay: "advanced",
+  inductor: "advanced",
+  ferriteBead: "advanced",
+  fastBlowFuse: "advanced",
+  resettableFuse: "advanced",
+  idealConnector: "advanced",
+  liIonCell: "advanced",
+  usbPowerBreakout: "advanced",
+  solarPanel: "advanced",
 };
 
 export const BOARD_TIER: Record<BoardType, GradeTier> = {

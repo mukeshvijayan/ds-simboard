@@ -261,6 +261,30 @@ function createComponent(
         simulatedHumidityPercent: 50,
         health,
       };
+    case "inductor":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "ferriteBead":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "fastBlowFuse":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "resettableFuse":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "idealConnector":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "liIonCell":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "usbPowerBreakout":
+      return { id, type: preset.type, params: preset.params, position, leads, health };
+    case "solarPanel":
+      return {
+        id,
+        type: preset.type,
+        params: preset.params,
+        position,
+        leads,
+        sunlightLevel: 0.5,
+        health,
+      };
   }
 }
 
@@ -523,6 +547,14 @@ export function Simulator() {
   function handleLightLevelChange(id: string, lightLevel: number) {
     setComponents((prev) =>
       prev.map((c) => (c.id === id && c.type === "ldr" ? { ...c, lightLevel } : c))
+    );
+  }
+
+  function handleSunlightLevelChange(id: string, sunlightLevel: number) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "solarPanel" ? { ...c, sunlightLevel } : c
+      )
     );
   }
 
@@ -973,6 +1005,7 @@ export function Simulator() {
               onTogglePressed={handleTogglePressed}
               onWiperChange={handleWiperChange}
               onLightLevelChange={handleLightLevelChange}
+              onSunlightLevelChange={handleSunlightLevelChange}
               onMotionToggle={handleMotionToggle}
               onWetnessChange={handleWetnessChange}
               onRainLevelChange={handleRainLevelChange}

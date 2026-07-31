@@ -12,6 +12,14 @@ import { DHT11_PIN_POSITIONS } from "../components/glyphs/Dht11Glyph";
 import { RGB_LED_PIN_POSITIONS } from "../components/glyphs/RgbLedGlyph";
 import { SEVEN_SEGMENT_PIN_POSITIONS } from "../components/glyphs/SevenSegmentGlyph";
 import { RELAY_PIN_POSITIONS } from "../components/glyphs/RelayGlyph";
+import { INDUCTOR_PIN_POSITIONS } from "../components/glyphs/InductorGlyph";
+import { FERRITE_BEAD_PIN_POSITIONS } from "../components/glyphs/FerriteBeadGlyph";
+import { FAST_BLOW_FUSE_PIN_POSITIONS } from "../components/glyphs/FastBlowFuseGlyph";
+import { RESETTABLE_FUSE_PIN_POSITIONS } from "../components/glyphs/ResettableFuseGlyph";
+import { IDEAL_CONNECTOR_PIN_POSITIONS } from "../components/glyphs/IdealConnectorGlyph";
+import { LI_ION_CELL_PIN_POSITIONS } from "../components/glyphs/LiIonCellGlyph";
+import { USB_POWER_BREAKOUT_PIN_POSITIONS } from "../components/glyphs/UsbPowerBreakoutGlyph";
+import { SOLAR_PANEL_PIN_POSITIONS } from "../components/glyphs/SolarPanelGlyph";
 import type { BreadboardComponentType } from "./types";
 
 /** A component's own rendered pixel footprint — must match its glyph's
@@ -45,6 +53,15 @@ export const COMPONENT_BOX_SIZE: Record<
   dcMotor: { width: 56, height: 26 },
   ldr: { width: 56, height: 26 },
   batteryHolder: { width: 56, height: 26 },
+  // ADR 0038: passives/protection, power, and storage/connectors.
+  inductor: { width: 80, height: 30 },
+  ferriteBead: { width: 80, height: 30 },
+  fastBlowFuse: { width: 80, height: 30 },
+  resettableFuse: { width: 80, height: 30 },
+  idealConnector: { width: 80, height: 30 },
+  liIonCell: { width: 80, height: 30 },
+  usbPowerBreakout: { width: 80, height: 30 },
+  solarPanel: { width: 80, height: 40 },
 };
 
 const GENERIC_LEADS = { lead1: { x: 0, y: 13 }, lead2: { x: 56, y: 13 } };
@@ -77,6 +94,14 @@ export const COMPONENT_PIN_LAYOUTS: Record<
   dcMotor: GENERIC_LEADS,
   ldr: GENERIC_LEADS,
   batteryHolder: GENERIC_LEADS,
+  inductor: INDUCTOR_PIN_POSITIONS,
+  ferriteBead: FERRITE_BEAD_PIN_POSITIONS,
+  fastBlowFuse: FAST_BLOW_FUSE_PIN_POSITIONS,
+  resettableFuse: RESETTABLE_FUSE_PIN_POSITIONS,
+  idealConnector: IDEAL_CONNECTOR_PIN_POSITIONS,
+  liIonCell: LI_ION_CELL_PIN_POSITIONS,
+  usbPowerBreakout: USB_POWER_BREAKOUT_PIN_POSITIONS,
+  solarPanel: SOLAR_PANEL_PIN_POSITIONS,
 };
 
 /** A named lead's position in percent of its own component's rendered
@@ -118,4 +143,12 @@ export const COMPONENT_LEAD_NAMES: Record<BreadboardComponentType, string[]> = {
   relay: ["coilA", "coilB", "contactA", "contactB"],
   rgbLed: ["common", "red", "green", "blue"],
   sevenSegmentDisplay: ["common", "a", "b", "c", "d", "e", "f", "g", "dp"],
+  inductor: ["lead1", "lead2"],
+  ferriteBead: ["lead1", "lead2"],
+  fastBlowFuse: ["lead1", "lead2"],
+  resettableFuse: ["lead1", "lead2"],
+  idealConnector: ["lead1", "lead2"],
+  liIonCell: ["lead1", "lead2"],
+  usbPowerBreakout: ["lead1", "lead2"],
+  solarPanel: ["lead1", "lead2"],
 };

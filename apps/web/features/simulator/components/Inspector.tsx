@@ -15,6 +15,7 @@ export function Inspector({
   onTogglePressed,
   onWiperChange,
   onLightLevelChange,
+  onSunlightLevelChange,
   onMotionToggle,
   onWetnessChange,
   onRainLevelChange,
@@ -28,6 +29,7 @@ export function Inspector({
   onTogglePressed: (id: string) => void;
   onWiperChange: (id: string, wiperPosition: number) => void;
   onLightLevelChange: (id: string, lightLevel: number) => void;
+  onSunlightLevelChange: (id: string, sunlightLevel: number) => void;
   onMotionToggle: (id: string) => void;
   onWetnessChange: (id: string, wetness: number) => void;
   onRainLevelChange: (id: string, rainLevel: number) => void;
@@ -292,6 +294,51 @@ export function Inspector({
           </>
         )}
 
+        {(component.type === "inductor" || component.type === "ferriteBead") && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">DC resistance</dt>
+            <dd>{component.params.dcResistanceOhms}Ω</dd>
+          </div>
+        )}
+
+        {(component.type === "fastBlowFuse" || component.type === "resettableFuse") && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Rated current</dt>
+              <dd>
+                {(component.type === "fastBlowFuse"
+                  ? component.params.ratedCurrentAmps
+                  : component.params.tripCurrentAmps) * 1000}
+                mA
+              </dd>
+            </div>
+            {component.type === "resettableFuse" && (
+              <div className="flex justify-between">
+                <dt className="text-charcoal-muted">State</dt>
+                <dd>{component.health.status === "stressed" ? "Tripped" : "Normal"}</dd>
+              </div>
+            )}
+          </>
+        )}
+
+        {(component.type === "liIonCell" || component.type === "usbPowerBreakout") &&
+          result && (
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Supplying</dt>
+              <dd>
+                {(result.visual as { suppliedVoltageVolts: number }).suppliedVoltageVolts}
+                V
+              </dd>
+            </div>
+          )}
+
+        {component.type === "solarPanel" && (
+          <div className="flex justify-between">
+            <dt className="text-charcoal-muted">Sunlight</dt>
+            <dd>{Math.round(component.sunlightLevel * 100)}%</dd>
+          </div>
+        )}
+
         {component.type === "sevenSegmentDisplay" && result && (
           <div className="flex justify-between">
             <dt className="text-charcoal-muted">Segments lit</dt>
@@ -356,6 +403,20 @@ export function Inspector({
             step={0.01}
             value={component.lightLevel}
             onChange={(e) => onLightLevelChange(component.id, Number(e.target.value))}
+          />
+        </label>
+      )}
+
+      {component.type === "solarPanel" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated sunlight level
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={component.sunlightLevel}
+            onChange={(e) => onSunlightLevelChange(component.id, Number(e.target.value))}
           />
         </label>
       )}

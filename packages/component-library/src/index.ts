@@ -172,3 +172,95 @@ export type {
   RelayCoilVisual,
   RelayContactVisual,
 } from "./components/relay/relay";
+
+// ADR 0038: passives/protection, diodes, power, storage/connectors, and
+// memory/data-conversion catalog expansion — buildable-now set only.
+
+export {
+  evaluateInductor,
+  inductorSeriesElement,
+  inductorModel,
+} from "./components/inductor/inductor";
+export type {
+  InductorParams,
+  InductorInput,
+  InductorVisual,
+} from "./components/inductor/inductor";
+
+export {
+  evaluateFerriteBead,
+  ferriteBeadSeriesElement,
+  ferriteBeadModel,
+} from "./components/ferriteBead/ferriteBead";
+export type {
+  FerriteBeadParams,
+  FerriteBeadInput,
+  FerriteBeadVisual,
+} from "./components/ferriteBead/ferriteBead";
+
+export {
+  evaluateFastBlowFuse,
+  fastBlowFuseSeriesElement,
+  fastBlowFuseModel,
+} from "./components/fastBlowFuse/fastBlowFuse";
+export type {
+  FastBlowFuseParams,
+  FastBlowFuseInput,
+  FastBlowFuseVisual,
+} from "./components/fastBlowFuse/fastBlowFuse";
+
+export {
+  evaluateResettableFuse,
+  resettableFuseSeriesElement,
+  resettableFuseModel,
+} from "./components/resettableFuse/resettableFuse";
+export type {
+  ResettableFuseParams,
+  ResettableFuseInput,
+  ResettableFuseVisual,
+} from "./components/resettableFuse/resettableFuse";
+
+export {
+  evaluateIdealConnector,
+  idealConnectorSeriesElement,
+  idealConnectorModel,
+} from "./components/idealConnector/idealConnector";
+export type {
+  IdealConnectorParams,
+  IdealConnectorInput,
+  IdealConnectorVisual,
+} from "./components/idealConnector/idealConnector";
+
+export {
+  evaluateLiIonCell,
+  liIonCellSeriesElement,
+  liIonCellModel,
+} from "./components/liIonCell/liIonCell";
+export type {
+  LiIonCellParams,
+  LiIonCellInput,
+  LiIonCellVisual,
+} from "./components/liIonCell/liIonCell";
+
+export {
+  evaluateUsbPowerBreakout,
+  usbPowerBreakoutSeriesElement,
+  usbPowerBreakoutModel,
+} from "./components/usbPowerBreakout/usbPowerBreakout";
+export type {
+  UsbPowerBreakoutParams,
+  UsbPowerBreakoutInput,
+  UsbPowerBreakoutVisual,
+} from "./components/usbPowerBreakout/usbPowerBreakout";
+
+export {
+  evaluateSolarPanel,
+  solarPanelSeriesElement,
+  effectiveSolarPanelResistance,
+  solarPanelModel,
+} from "./components/solarPanel/solarPanel";
+export type {
+  SolarPanelParams,
+  SolarPanelInput,
+  SolarPanelVisual,
+} from "./components/solarPanel/solarPanel";
