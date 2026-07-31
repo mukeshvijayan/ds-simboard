@@ -581,7 +581,16 @@ export function Simulator() {
 
   function handleAddBoard(
     boardType: PlacedBoard["boardType"],
-    position: { x: number; y: number } = { x: 800, y: 60 + boards.length * 60 }
+    // Staggered by more than either board type's own tallest dimension
+    // (ESP32's 300px height is the largest) so a freshly-added board
+    // never spawns overlapping an earlier one regardless of which
+    // combination of board types is already placed — a real, visible
+    // bug an earlier ADR (0034) flagged and deferred to Part 2's
+    // drag-and-drop work, now that it exists.
+    position: { x: number; y: number } = {
+      x: 800 + boards.length * 40,
+      y: 60 + boards.length * 340,
+    }
   ) {
     const id = `${boardType}-${nextId++}`;
     const board: PlacedBoard =

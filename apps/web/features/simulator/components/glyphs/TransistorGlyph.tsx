@@ -62,11 +62,18 @@ export function TransistorGlyph({
       {/* on-state indicator */}
       {isOn && <circle cx="30" cy="20" r="3" fill={glowColor} />}
       {/* pin labels — must match TRANSISTOR_PIN_POSITIONS (base=15, collector=30, emitter=45).
-       * Dark, bold, and directly below the leads: high-contrast against the
-       * light canvas, not white-on-white (the real bug this fixed). */}
+       * Dark, bold, high-contrast against the light canvas (not
+       * white-on-white, the original bug this fixed) — and positioned
+       * mid-lead, clear of both the body above (ends y=40) and the
+       * lead's own clickable wiring-point button below (Part 2, centered
+       * on the lead's y=62 tip): a labeled placed directly on that
+       * button gets visually swallowed by it, the same bug ADR 0034
+       * found and fixed for board pin labels, rediscovered here after
+       * Part 2 added a same-position button this glyph didn't have
+       * before. */}
       <text
         x="15"
-        y="67"
+        y="50"
         fontSize="10"
         textAnchor="middle"
         fill="#22314F"
@@ -76,7 +83,7 @@ export function TransistorGlyph({
       </text>
       <text
         x="30"
-        y="67"
+        y="50"
         fontSize="10"
         textAnchor="middle"
         fill="#22314F"
@@ -86,7 +93,7 @@ export function TransistorGlyph({
       </text>
       <text
         x="45"
-        y="67"
+        y="50"
         fontSize="10"
         textAnchor="middle"
         fill="#22314F"
