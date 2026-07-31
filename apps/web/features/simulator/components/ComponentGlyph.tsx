@@ -35,6 +35,7 @@ import { UsbPowerBreakoutGlyph } from "./glyphs/UsbPowerBreakoutGlyph";
 import { SolarPanelGlyph } from "./glyphs/SolarPanelGlyph";
 import { BridgeRectifierGlyph } from "./glyphs/BridgeRectifierGlyph";
 import { PhotodiodeGlyph } from "./glyphs/PhotodiodeGlyph";
+import { ServoGlyph } from "./glyphs/ServoGlyph";
 
 /** Only the few types not yet given hand-authored SVG artwork fall
  * through to this plain colored-box glyph (buzzer, DC motor, LDR,
@@ -229,6 +230,11 @@ export function ComponentGlyph({
     }
     if (component.type === "bridgeRectifier") {
       return <BridgeRectifierGlyph />;
+    }
+    if (component.type === "servo") {
+      const angleDegrees =
+        (result?.visual as { angleDegrees?: number })?.angleDegrees ?? 90;
+      return <ServoGlyph angleDegrees={angleDegrees} failed={failed} />;
     }
     const color = glyphColor(component, result);
     return (

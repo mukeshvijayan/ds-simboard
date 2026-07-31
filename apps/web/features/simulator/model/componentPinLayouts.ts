@@ -22,6 +22,7 @@ import { USB_POWER_BREAKOUT_PIN_POSITIONS } from "../components/glyphs/UsbPowerB
 import { SOLAR_PANEL_PIN_POSITIONS } from "../components/glyphs/SolarPanelGlyph";
 import { BRIDGE_RECTIFIER_PIN_POSITIONS } from "../components/glyphs/BridgeRectifierGlyph";
 import { PHOTODIODE_PIN_POSITIONS } from "../components/glyphs/PhotodiodeGlyph";
+import { SERVO_PIN_POSITIONS } from "../components/glyphs/ServoGlyph";
 import type { BreadboardComponentType } from "./types";
 
 /** A component's own rendered pixel footprint — must match its glyph's
@@ -66,6 +67,7 @@ export const COMPONENT_BOX_SIZE: Record<
   solarPanel: { width: 80, height: 40 },
   bridgeRectifier: { width: 70, height: 58 },
   photodiode: { width: 78, height: 40 },
+  servo: { width: 70, height: 70 },
 };
 
 const GENERIC_LEADS = { lead1: { x: 0, y: 13 }, lead2: { x: 56, y: 13 } };
@@ -108,6 +110,7 @@ export const COMPONENT_PIN_LAYOUTS: Record<
   solarPanel: SOLAR_PANEL_PIN_POSITIONS,
   bridgeRectifier: BRIDGE_RECTIFIER_PIN_POSITIONS,
   photodiode: PHOTODIODE_PIN_POSITIONS,
+  servo: SERVO_PIN_POSITIONS,
 };
 
 /** A named lead's position in percent of its own component's rendered
@@ -159,4 +162,5 @@ export const COMPONENT_LEAD_NAMES: Record<BreadboardComponentType, string[]> = {
   solarPanel: ["lead1", "lead2"],
   bridgeRectifier: ["acLead1", "acLead2", "dcPositiveLead", "dcNegativeLead"],
   photodiode: ["anode", "cathode"],
+  servo: ["power", "ground", "signal"],
 };

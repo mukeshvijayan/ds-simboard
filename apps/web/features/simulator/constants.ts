@@ -20,6 +20,7 @@ import type {
   ResettableFuseParams,
   RelayParams,
   ResistorParams,
+  ServoParams,
   SoilMoistureSensorParams,
   SolarPanelParams,
   SoundSensorParams,
@@ -72,6 +73,7 @@ export const PART_LABELS: Record<BreadboardComponentType, string> = {
   solarPanel: "Solar Panel",
   bridgeRectifier: "Bridge Rectifier",
   photodiode: "Photodiode",
+  servo: "Servo Motor",
 };
 
 /**
@@ -130,7 +132,8 @@ export type PartPreset =
       label: string;
       params: BridgeRectifierParams;
     }
-  | { id: string; type: "photodiode"; label: string; params: PhotodiodeParams };
+  | { id: string; type: "photodiode"; label: string; params: PhotodiodeParams }
+  | { id: string; type: "servo"; label: string; params: ServoParams };
 
 /**
  * Palette grouping (Part 2, docs/architecture/0036-*.md): a type with
@@ -634,6 +637,14 @@ export const PART_PRESETS: PartPreset[] = [
       darkResistanceOhms: 10_000_000,
       litResistanceOhms: 1_000,
     },
+  },
+  // ADR 0039: real SG90-style micro servo ratings (5V, ~100mA typical
+  // running current, ~600mA stall current before damage).
+  {
+    id: "servo",
+    type: "servo",
+    label: "Servo Motor",
+    params: { ratedVoltageVolts: 5, ratedCurrentAmps: 0.1, maxCurrentAmps: 0.6 },
   },
 ];
 

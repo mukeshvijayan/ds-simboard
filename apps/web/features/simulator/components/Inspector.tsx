@@ -17,6 +17,7 @@ export function Inspector({
   onLightLevelChange,
   onSunlightLevelChange,
   onPhotodiodeLightLevelChange,
+  onServoPulseWidthChange,
   onMotionToggle,
   onWetnessChange,
   onRainLevelChange,
@@ -32,6 +33,7 @@ export function Inspector({
   onLightLevelChange: (id: string, lightLevel: number) => void;
   onSunlightLevelChange: (id: string, sunlightLevel: number) => void;
   onPhotodiodeLightLevelChange: (id: string, lightLevel: number) => void;
+  onServoPulseWidthChange: (id: string, pulseWidthMicroseconds: number) => void;
   onMotionToggle: (id: string) => void;
   onWetnessChange: (id: string, wetness: number) => void;
   onRainLevelChange: (id: string, rainLevel: number) => void;
@@ -163,6 +165,21 @@ export function Inspector({
               {" / 4"}
             </dd>
           </div>
+        )}
+
+        {component.type === "servo" && result && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Angle</dt>
+              <dd>
+                {Math.round((result.visual as { angleDegrees: number }).angleDegrees)}°
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-charcoal-muted">Pulse width</dt>
+              <dd>{component.pulseWidthMicroseconds}µs</dd>
+            </div>
+          </>
         )}
 
         {component.type === "buzzer" && result && (
@@ -481,6 +498,22 @@ export function Inspector({
             value={component.lightLevel}
             onChange={(e) =>
               onPhotodiodeLightLevelChange(component.id, Number(e.target.value))
+            }
+          />
+        </label>
+      )}
+
+      {component.type === "servo" && (
+        <label className="flex flex-col gap-1 text-[13px] text-charcoal">
+          Simulated pulse width (µs)
+          <input
+            type="range"
+            min={1000}
+            max={2000}
+            step={10}
+            value={component.pulseWidthMicroseconds}
+            onChange={(e) =>
+              onServoPulseWidthChange(component.id, Number(e.target.value))
             }
           />
         </label>

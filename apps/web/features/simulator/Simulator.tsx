@@ -159,6 +159,19 @@ function createComponent(
       health: { d1: health, d2: health, d3: health, d4: health },
     };
   }
+  if (preset.type === "servo") {
+    return {
+      id,
+      type: preset.type,
+      params: preset.params,
+      position,
+      powerLead: lead("power"),
+      groundLead: lead("ground"),
+      signalLead: lead("signal"),
+      pulseWidthMicroseconds: 1500,
+      health,
+    };
+  }
 
   const leads: [ConnectionPointRef, ConnectionPointRef] = [
     lead(leadNames[0]),
@@ -585,6 +598,14 @@ export function Simulator() {
   function handlePhotodiodeLightLevelChange(id: string, lightLevel: number) {
     setComponents((prev) =>
       prev.map((c) => (c.id === id && c.type === "photodiode" ? { ...c, lightLevel } : c))
+    );
+  }
+
+  function handleServoPulseWidthChange(id: string, pulseWidthMicroseconds: number) {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === id && c.type === "servo" ? { ...c, pulseWidthMicroseconds } : c
+      )
     );
   }
 
@@ -1037,6 +1058,7 @@ export function Simulator() {
               onLightLevelChange={handleLightLevelChange}
               onSunlightLevelChange={handleSunlightLevelChange}
               onPhotodiodeLightLevelChange={handlePhotodiodeLightLevelChange}
+              onServoPulseWidthChange={handleServoPulseWidthChange}
               onMotionToggle={handleMotionToggle}
               onWetnessChange={handleWetnessChange}
               onRainLevelChange={handleRainLevelChange}

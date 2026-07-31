@@ -32,6 +32,7 @@ import {
   evaluateRelayContact,
   evaluateResettableFuse,
   evaluateResistor,
+  evaluateServo,
   evaluateSoilMoistureSensor,
   evaluateSolarPanel,
   evaluateSoundSensor,
@@ -50,6 +51,8 @@ import {
   relayIsEnergized,
   resettableFuseSeriesElement,
   resistorSeriesElement,
+  servoSeriesElement,
+  SERVO_SIGNAL_IMPEDANCE_OHMS,
   soilMoistureSensorSeriesElement,
   solarPanelSeriesElement,
   soundSensorSeriesElement,
@@ -81,6 +84,7 @@ import {
   type RelayContactVisual,
   type ResettableFuseVisual,
   type ResistorVisual,
+  type ServoVisual,
   type SoilMoistureSensorVisual,
   type SolarPanelVisual,
   type SoundSensorVisual,
@@ -106,6 +110,7 @@ import {
   type PlacedPhotodiode,
   type PlacedRelay,
   type PlacedRgbLed,
+  type PlacedServo,
   type PlacedSevenSegmentDisplay,
   type PlacedTransistor,
   type SevenSegmentName,
@@ -168,7 +173,8 @@ export type ComponentVisual =
   | UsbPowerBreakoutVisual
   | SolarPanelVisual
   | BridgeRectifierVisual
-  | PhotodiodeVisual;
+  | PhotodiodeVisual
+  | ServoVisual;
 
 /** A multi-lead component's `health` is per-channel (a real LED die can
  * fail independently of its neighbors sharing one package) — not every
@@ -713,6 +719,19 @@ function describeElement(
     const branch = elementId.slice(component.id.length + 1) as "d1" | "d2" | "d3" | "d4";
     return describeLedLikeElement(component.params.diode, component.health[branch]);
   }
+  if (component.type === "servo") {
+    if (elementId.endsWith(":signal")) {
+      // Fixed high-impedance branch (ADR 0039) — real enough to
+      // participate in the graph, never a source of the solved angle.
+      return { kind: "resistive", resistanceOhms: SERVO_SIGNAL_IMPEDANCE_OHMS };
+    }
+    return {
+      kind: "resistive",
+      resistanceOhms: resistanceOhmsOf(
+        servoSeriesElement(component.params, component.health)
+      ),
+    };
+  }
   if (component.type === "transistor") {
     if (elementId.endsWith(":be")) {
       if (component.health.status === "failed") {
@@ -963,6 +982,22 @@ function evaluateRelayComponent(
   };
 }
 
+/** A servo's angle comes entirely from its simulated pulse-width input
+ * (ADR 0039) — only its health depends on the power branch's real
+ * solved current, the signal branch never feeds back into `evaluate`. */
+function evaluateServoComponent(
+  component: PlacedServo,
+  getOutcome: (elementId: string) => ElementOutcome
+): ComponentResult {
+  const currentAmps = currentAmpsOf(getOutcome(`${component.id}:power`));
+  const result = evaluateServo(
+    component.params,
+    { currentAmps, pulseWidthMicroseconds: component.pulseWidthMicroseconds },
+    { health: component.health }
+  );
+  return { health: result.health, visual: result.visual };
+}
+
 function evaluateComponent(
   component: PlacedComponent,
   getOutcome: (elementId: string) => ElementOutcome,
@@ -982,6 +1017,9 @@ function evaluateComponent(
   }
   if (component.type === "bridgeRectifier") {
     return evaluateBridgeRectifier(component, getOutcome);
+  }
+  if (component.type === "servo") {
+    return evaluateServoComponent(component, getOutcome);
   }
   if (component.type === "photodiode") {
     return evaluatePhotodiodeComponent(component, getOutcome(component.id));

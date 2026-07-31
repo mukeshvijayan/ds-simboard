@@ -80,6 +80,24 @@ export function componentGraphElements(
     ];
   }
 
+  if (component.type === "servo") {
+    // Power/ground is the real current-carrying branch; signal/ground is
+    // a fixed high-impedance branch (ADR 0039) — neither depends on the
+    // other's solved current, unlike transistor/relay's two-phase shape.
+    return [
+      {
+        elementId: `${component.id}:power`,
+        nodeA: component.powerLead,
+        nodeB: component.groundLead,
+      },
+      {
+        elementId: `${component.id}:signal`,
+        nodeA: component.signalLead,
+        nodeB: component.groundLead,
+      },
+    ];
+  }
+
   if (component.type === "bridgeRectifier") {
     // The classic full-bridge topology: whichever AC lead is momentarily
     // higher forward-biases the diode pair that routes current to
@@ -158,6 +176,9 @@ export function componentLeadPoints(component: PlacedComponent): ConnectionPoint
       component.dcPositiveLead,
       component.dcNegativeLead,
     ];
+  }
+  if (component.type === "servo") {
+    return [component.powerLead, component.groundLead, component.signalLead];
   }
   return [component.leads[0], component.leads[1]];
 }

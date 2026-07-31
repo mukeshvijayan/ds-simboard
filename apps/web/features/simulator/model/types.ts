@@ -20,6 +20,7 @@ import type {
   ResettableFuseParams,
   RelayParams,
   ResistorParams,
+  ServoParams,
   SoilMoistureSensorParams,
   SolarPanelParams,
   SoundSensorParams,
@@ -68,7 +69,8 @@ export type BreadboardComponentType =
   | "usbPowerBreakout"
   | "solarPanel"
   | "bridgeRectifier"
-  | "photodiode";
+  | "photodiode"
+  | "servo";
 
 interface BaseComponent {
   id: string;
@@ -315,6 +317,30 @@ export interface PlacedBridgeRectifier {
 }
 
 /**
+ * A servo motor (ADR 0039) — three leads, two graph branches sharing
+ * `groundLead`: `power`/`ground` is the real current-carrying branch,
+ * `signal`/`ground` is a fixed high-impedance branch (a real servo's
+ * signal pin), neither of which needs a two-phase resolve (unlike
+ * transistor/relay) since neither branch's behavior depends on the
+ * other's solved current — the angle comes from a simulated pulse-width
+ * input, not from anything sensed on the signal branch.
+ */
+export interface PlacedServo {
+  id: string;
+  type: "servo";
+  params: ServoParams;
+  position: { x: number; y: number };
+  powerLead: ConnectionPointRef;
+  groundLead: ConnectionPointRef;
+  signalLead: ConnectionPointRef;
+  /** Simulated PWM pulse width in microseconds, 1000-2000 (ADR 0039) —
+   * user-adjustable, standing in for a real duty cycle this simulator's
+   * chip emulation can't sense. */
+  pulseWidthMicroseconds: number;
+  health: HealthState;
+}
+
+/**
  * Transistor-as-switch and relay module (P2-2 part 2, closing ADR 0022)
  * both need a two-phase resolve — one branch's on/off state depends on a
  * *different* branch's real solved current, not its own. See
@@ -378,7 +404,8 @@ export type PlacedComponent =
   | PlacedUsbPowerBreakout
   | PlacedSolarPanel
   | PlacedBridgeRectifier
-  | PlacedPhotodiode;
+  | PlacedPhotodiode
+  | PlacedServo;
 
 /** A user-drawn wire directly connecting any two connection points. */
 export interface CanvasWireModel {

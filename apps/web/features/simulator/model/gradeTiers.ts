@@ -72,6 +72,7 @@ export const COMPONENT_TIER: Record<BreadboardComponentType, GradeTier> = {
   solarPanel: "advanced",
   bridgeRectifier: "advanced",
   photodiode: "advanced",
+  servo: "advanced",
 };
 
 export const BOARD_TIER: Record<BoardType, GradeTier> = {

@@ -275,3 +275,15 @@ export type {
   PhotodiodeInput,
   PhotodiodeVisual,
 } from "./components/photodiode/photodiode";
+
+// ADR 0039: servo motor — simulated pulse width, not sensed PWM.
+export {
+  evaluateServo,
+  servoAngleFromPulseWidth,
+  servoSeriesElement,
+  servoModel,
+  SERVO_MIN_PULSE_MICROSECONDS,
+  SERVO_MAX_PULSE_MICROSECONDS,
+  SERVO_SIGNAL_IMPEDANCE_OHMS,
+} from "./components/servo/servo";
+export type { ServoParams, ServoInput, ServoVisual } from "./components/servo/servo";
